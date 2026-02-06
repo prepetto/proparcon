@@ -1,0 +1,55 @@
+name: proparcon_unificado
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: proparcon_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-proparcon_db}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata_rescatado:/var/lib/postgresql/data
+
+  api:
+    build:
+      context: ./proparcon-api
+    container_name: proparcon_api
+    restart: unless-stopped
+    env_file:
+      - ./proparcon-api/.env
+    working_dir: /app
+    volumes:
+      - ./proparcon-api:/app:rw
+    environment:
+      - ALEMBIC_CONFIG=/app/alembic.ini
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+
+  web:
+    build:
+      context: ./proparcon-web
+      dockerfile: Dockerfile.dev
+    container_name: proparcon_web
+    restart: unless-stopped
+    working_dir: /app
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./proparcon-web:/app:rw
+      - /app/node_modules
+    environment:
+      - VITE_API_BASE_URL=http://localhost:8000
+    command: sh -lc "npm install && npm run dev -- --host 0.0.0.0 --port 5173"
+    depends_on:
+      - api
+
+volumes:
+  pgdata_rescatado:
+    external: true
+    name: proparcon-api_pgdata

@@ -1,0 +1,2875 @@
+{
+  "info": {
+    "_postman_id": "c9ec88c8-aeaa-47d4-81fe-e38a5fe7c488",
+    "name": "PROPARCON Catálogos",
+    "description": "Colección CRUD para todos los catálogos PROPARCON.\n\nComentarios/Notas:\n- Todas las URLs usan {{url}} (NO {{baseUrl}}).\n- Login por JSON (username/password) contra /v1/auth/login.\n- Guarda token en variable {{token}}.\n- Orden funcional: primero catálogos simples, luego jerárquicos.\n- Provincia: SIEMPRE filtrado por pais_id seleccionado.\n\nRequisitos:\n- Define {{url}} (ej: http://localhost:8000)\n- Define {{admin_email}} y {{admin_password}} (o credenciales válidas)\n\n\nV2: colección normalizada. Todos los catálogos simples tienen 5 requests (List/Create/GetById/Patch/Delete). Jerárquicos: flujo pais+provincia con cleanup garantizado.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "47630111",
+    "_collection_link": "https://go.postman.co/collection/47630111-c9ec88c8-aeaa-47d4-81fe-e38a5fe7c488?source=collection_link"
+  },
+  "item": [
+    {
+      "name": "00 · Auth",
+      "item": [
+        {
+          "name": "POST Login (JSON) → set {{token}}",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Genera sufijo único por ejecución (Runner-safe)",
+                  "const now = Date.now();",
+                  "pm.collectionVariables.set('uniq', String(now));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// -----------------------------------------------------------------------------",
+                  "// POST Login (JSON) → Tests",
+                  "// - Valida respuesta 200",
+                  "// - Extrae token (soporta varias claves posibles)",
+                  "// - Guarda token en Collection + Environment + Variables (Runner-proof)",
+                  "// -----------------------------------------------------------------------------",
+                  "",
+                  "pm.test(\"Status 200\", function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "let data = {};",
+                  "try {",
+                  "  data = pm.response.json();",
+                  "} catch (e) {",
+                  "  data = {};",
+                  "}",
+                  "",
+                  "// Soporta varias claves posibles de token",
+                  "const t =",
+                  "  (data && (data.access_token || data.token || data.jwt)) ||",
+                  "  \"\";",
+                  "",
+                  "// Validación mínima del token",
+                  "pm.test(\"Token presente\", function () {",
+                  "  pm.expect(t).to.be.a(\"string\");",
+                  "  pm.expect(t.length).to.be.greaterThan(10);",
+                  "});",
+                  "",
+                  "// Guarda token en TODOS los scopes útiles",
+                  "// (si existe token en Environment y está vacío, esto lo sobrescribe)",
+                  "pm.collectionVariables.set(\"token\", t);",
+                  "pm.environment.set(\"token\", t);",
+                  "pm.variables.set(\"token\", t);",
+                  "",
+                  "// Opcional: marca visual para depurar en Runner",
+                  "console.log(\"TOKEN(len):\", t.length);",
+                  ""
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\": \"{{admin_email}}\", \"password\": \"{{admin_password}}\"}"
+            },
+            "url": {
+              "raw": "{{url}}/v1/auth/login",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Login por JSON.\n\nComentario:\n- Evita form-urlencoded para no caer en 422 si el backend espera JSON."
+          },
+          "response": []
+        }
+      ],
+      "description": "Login y gestión de token.\n\nComentario:\n- Si tu API devuelve access_token, lo guarda en {{token}}.\n- Si devuelve token, también lo soporta."
+    },
+    {
+      "name": "10 · Catálogos simples (CRUD)",
+      "item": [
+        {
+          "name": "estado_oferta",
+          "item": [
+            {
+              "name": "GET List",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{url}}/api/catalogos/estado_oferta",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "catalogos",
+                    "estado_oferta"
+                  ]
+                },
+                "description": "Lista estado_oferta."
+              },
+              "response": []
+            },
+            {
+              "name": "POST Create → set {{id_estado_oferta}}",
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "// Genera sufijo único por ejecución (Runner-safe)",
+                      "const now = Date.now();",
+                      "pm.collectionVariables.set('uniq', String(now));"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200/201', function () {",
+                      "  pm.expect([200,201]).to.include(pm.response.code);",
+                      "});",
+                      "let data = {};",
+                      "try { data = pm.response.json(); } catch (e) { data = {}; }",
+                      "const id = data.id || data.data?.id || '';",
+                      "pm.test('ID devuelto', () => pm.expect(String(id)).to.not.equal(''));",
+                      "pm.collectionVariables.set('id_estado_oferta', String(id));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"codigo\": \"TEST_OFERTA_{{uniq}}\",\n  \"descripcion\": \"Estado oferta creado por Postman\"\n}"
+                },
+                "url": {
+                  "raw": "{{url}}/api/catalogos/estado_oferta",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "catalogos",
+                    "estado_oferta"
+                  ]
+                },
+                "description": "Crea registro."
+              },
+              "response": []
+            },
+            {
+              "name": "GET By ID",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                      "pm.test('id_estado_oferta presente', () => pm.expect(pm.collectionVariables.get('id_estado_oferta')).to.not.equal(''));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{url}}/api/catalogos/estado_oferta/{{id_estado_oferta}}",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "catalogos",
+                    "estado_oferta",
+                    "{{id_estado_oferta}}"
+                  ]
+                },
+                "description": "Lee registro por id."
+              },
+              "response": []
+            },
+            {
+              "name": "PATCH Update",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"descripcion\": \"Estado oferta actualizado por Postman\"\n}"
+                },
+                "url": {
+                  "raw": "{{url}}/api/catalogos/estado_oferta/{{id_estado_oferta}}",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "catalogos",
+                    "estado_oferta",
+                    "{{id_estado_oferta}}"
+                  ]
+                },
+                "description": "Actualiza parcial."
+              },
+              "response": []
+            },
+            {
+              "name": "DELETE",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200/204', function () {",
+                      "  pm.expect([200,204]).to.include(pm.response.code);",
+                      "});",
+                      "pm.collectionVariables.unset('id_estado_oferta');"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{url}}/api/catalogos/estado_oferta/{{id_estado_oferta}}",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "catalogos",
+                    "estado_oferta",
+                    "{{id_estado_oferta}}"
+                  ]
+                },
+                "description": "Borra registro."
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "estado_contrato",
+          "item": [
+            {
+              "name": "GET List",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{url}}/api/catalogos/estado_contrato",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "catalogos",
+                    "estado_contrato"
+                  ]
+                },
+                "description": "Lista estado_contrato."
+              },
+              "response": []
+            },
+            {
+              "name": "POST Create → set {{id_estado_contrato}}",
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "// Genera sufijo único por ejecución (Runner-safe)",
+                      "const now = Date.now();",
+                      "pm.collectionVariables.set('uniq', String(now));"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200/201', function () {",
+                      "  pm.expect([200,201]).to.include(pm.response.code);",
+                      "});",
+                      "let data = {};",
+                      "try { data = pm.response.json(); } catch (e) { data = {}; }",
+                      "const id = data.id || data.data?.id || '';",
+                      "pm.test('ID devuelto', () => pm.expect(String(id)).to.not.equal(''));",
+                      "pm.collectionVariables.set('id_estado_contrato', String(id));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"codigo\": \"TEST_CONTRATO_{{uniq}}\",\n  \"descripcion\": \"Estado contrato creado por Postman\"\n}"
+                },
+                "url": {
+                  "raw": "{{url}}/api/catalogos/estado_contrato",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "catalogos",
+                    "estado_contrato"
+                  ]
+                },
+                "description": "Crea registro."
+              },
+              "response": []
+            },
+            {
+              "name": "GET By ID",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                      "pm.test('id_estado_contrato presente', () => pm.expect(pm.collectionVariables.get('id_estado_contrato')).to.not.equal(''));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{url}}/api/catalogos/estado_contrato/{{id_estado_contrato}}",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "catalogos",
+                    "estado_contrato",
+                    "{{id_estado_contrato}}"
+                  ]
+                },
+                "description": "Lee registro por id."
+              },
+              "response": []
+            },
+            {
+              "name": "PATCH Update",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"descripcion\": \"Estado contrato actualizado por Postman\"\n}"
+                },
+                "url": {
+                  "raw": "{{url}}/api/catalogos/estado_contrato/{{id_estado_contrato}}",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "catalogos",
+                    "estado_contrato",
+                    "{{id_estado_contrato}}"
+                  ]
+                },
+                "description": "Actualiza parcial."
+              },
+              "response": []
+            },
+            {
+              "name": "DELETE",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200/204', function () {",
+                      "  pm.expect([200,204]).to.include(pm.response.code);",
+                      "});",
+                      "pm.collectionVariables.unset('id_estado_contrato');"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{url}}/api/catalogos/estado_contrato/{{id_estado_contrato}}",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "catalogos",
+                    "estado_contrato",
+                    "{{id_estado_contrato}}"
+                  ]
+                },
+                "description": "Borra registro."
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "tipo_inmueble",
+          "item": [
+            {
+              "name": "GET List",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{url}}/api/catalogos/tipo_inmueble",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "catalogos",
+                    "tipo_inmueble"
+                  ]
+                },
+                "description": "Lista tipo_inmueble."
+              },
+              "response": []
+            },
+            {
+              "name": "POST Create → set {{id_tipo_inmueble}}",
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "// Genera sufijo único por ejecución (Runner-safe)",
+                      "const now = Date.now();",
+                      "pm.collectionVariables.set('uniq', String(now));"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200/201', function () {",
+                      "  pm.expect([200,201]).to.include(pm.response.code);",
+                      "});",
+                      "let data = {};",
+                      "try { data = pm.response.json(); } catch (e) { data = {}; }",
+                      "const id = data.id || data.data?.id || '';",
+                      "pm.test('ID devuelto', () => pm.expect(String(id)).to.not.equal(''));",
+                      "pm.collectionVariables.set('id_tipo_inmueble', String(id));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"codigo\": \"TEST_TINM_{{uniq}}\",\n  \"descripcion\": \"Tipo inmueble creado por Postman\"\n}"
+                },
+                "url": {
+                  "raw": "{{url}}/api/catalogos/tipo_inmueble",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "catalogos",
+                    "tipo_inmueble"
+                  ]
+                },
+                "description": "Crea registro."
+              },
+              "response": []
+            },
+            {
+              "name": "GET By ID",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                      "pm.test('id_tipo_inmueble presente', () => pm.expect(pm.collectionVariables.get('id_tipo_inmueble')).to.not.equal(''));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{url}}/api/catalogos/tipo_inmueble/{{id_tipo_inmueble}}",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "catalogos",
+                    "tipo_inmueble",
+                    "{{id_tipo_inmueble}}"
+                  ]
+                },
+                "description": "Lee registro por id."
+              },
+              "response": []
+            },
+            {
+              "name": "PATCH Update",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"descripcion\": \"Tipo inmueble actualizado\"\n}"
+                },
+                "url": {
+                  "raw": "{{url}}/api/catalogos/tipo_inmueble/{{id_tipo_inmueble}}",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "catalogos",
+                    "tipo_inmueble",
+                    "{{id_tipo_inmueble}}"
+                  ]
+                },
+                "description": "Actualiza parcial."
+              },
+              "response": []
+            },
+            {
+              "name": "DELETE",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200/204', function () {",
+                      "  pm.expect([200,204]).to.include(pm.response.code);",
+                      "});",
+                      "pm.collectionVariables.unset('id_tipo_inmueble');"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{url}}/api/catalogos/tipo_inmueble/{{id_tipo_inmueble}}",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "catalogos",
+                    "tipo_inmueble",
+                    "{{id_tipo_inmueble}}"
+                  ]
+                },
+                "description": "Borra registro."
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "tipo_via",
+          "item": [
+            {
+              "name": "GET List",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{url}}/api/catalogos/tipo_via",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "catalogos",
+                    "tipo_via"
+                  ]
+                },
+                "description": "Lista tipo_via."
+              },
+              "response": []
+            },
+            {
+              "name": "POST Create → set {{id_tipo_via}}",
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "// Genera sufijo único corto (cat_tipo_via.codigo es varchar(20))",
+                      "const now = Date.now().toString();",
+                      "pm.collectionVariables.set('uniq', now.slice(-6));"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200/201', function () {",
+                      "  pm.expect([200,201]).to.include(pm.response.code);",
+                      "});",
+                      "let data = {};",
+                      "try { data = pm.response.json(); } catch (e) { data = {}; }",
+                      "const id = data.id || data.data?.id || '';",
+                      "pm.test('ID devuelto', () => pm.expect(String(id)).to.not.equal(''));",
+                      "pm.collectionVariables.set('id_tipo_via', String(id));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"codigo\": \"TEST_TVIA_{{uniq}}\",\n  \"descripcion\": \"Tipo vía creado por Postman\"\n}"
+                },
+                "url": {
+                  "raw": "{{url}}/api/catalogos/tipo_via",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "catalogos",
+                    "tipo_via"
+                  ]
+                },
+                "description": "Crea registro."
+              },
+              "response": []
+            },
+            {
+              "name": "GET By ID",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                      "pm.test('id_tipo_via presente', () => pm.expect(pm.collectionVariables.get('id_tipo_via')).to.not.equal(''));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{url}}/api/catalogos/tipo_via/{{id_tipo_via}}",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "catalogos",
+                    "tipo_via",
+                    "{{id_tipo_via}}"
+                  ]
+                },
+                "description": "Lee registro por id."
+              },
+              "response": []
+            },
+            {
+              "name": "PATCH Update",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"descripcion\": \"Tipo vía actualizado\"\n}"
+                },
+                "url": {
+                  "raw": "{{url}}/api/catalogos/tipo_via/{{id_tipo_via}}",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "catalogos",
+                    "tipo_via",
+                    "{{id_tipo_via}}"
+                  ]
+                },
+                "description": "Actualiza parcial."
+              },
+              "response": []
+            },
+            {
+              "name": "DELETE",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200/204', function () {",
+                      "  pm.expect([200,204]).to.include(pm.response.code);",
+                      "});",
+                      "pm.collectionVariables.unset('id_tipo_via');"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{url}}/api/catalogos/tipo_via/{{id_tipo_via}}",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "catalogos",
+                    "tipo_via",
+                    "{{id_tipo_via}}"
+                  ]
+                },
+                "description": "Borra registro."
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "rol",
+          "item": [
+            {
+              "name": "GET List",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{url}}/api/catalogos/rol",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "catalogos",
+                    "rol"
+                  ]
+                },
+                "description": "Lista rol."
+              },
+              "response": []
+            },
+            {
+              "name": "POST Create → set {{id_rol}}",
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "// Genera sufijo único por ejecución (Runner-safe)",
+                      "const now = Date.now();",
+                      "pm.collectionVariables.set('uniq', String(now));"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200/201', function () {",
+                      "  pm.expect([200,201]).to.include(pm.response.code);",
+                      "});",
+                      "let data = {};",
+                      "try { data = pm.response.json(); } catch (e) { data = {}; }",
+                      "const id = data.id || data.data?.id || '';",
+                      "pm.test('ID devuelto', () => pm.expect(String(id)).to.not.equal(''));",
+                      "pm.collectionVariables.set('id_rol', String(id));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"codigo\": \"TEST_ROL_{{uniq}}\",\n  \"descripcion\": \"Rol creado por Postman\"\n}"
+                },
+                "url": {
+                  "raw": "{{url}}/api/catalogos/rol",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "catalogos",
+                    "rol"
+                  ]
+                },
+                "description": "Crea registro."
+              },
+              "response": []
+            },
+            {
+              "name": "GET By ID",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                      "pm.test('id_rol presente', () => pm.expect(pm.collectionVariables.get('id_rol')).to.not.equal(''));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{url}}/api/catalogos/rol/{{id_rol}}",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "catalogos",
+                    "rol",
+                    "{{id_rol}}"
+                  ]
+                },
+                "description": "Lee registro por id."
+              },
+              "response": []
+            },
+            {
+              "name": "PATCH Update",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"descripcion\": \"Rol actualizado\"\n}"
+                },
+                "url": {
+                  "raw": "{{url}}/api/catalogos/rol/{{id_rol}}",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "catalogos",
+                    "rol",
+                    "{{id_rol}}"
+                  ]
+                },
+                "description": "Actualiza parcial."
+              },
+              "response": []
+            },
+            {
+              "name": "DELETE",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200/204', function () {",
+                      "  pm.expect([200,204]).to.include(pm.response.code);",
+                      "});",
+                      "pm.collectionVariables.unset('id_rol');"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{url}}/api/catalogos/rol/{{id_rol}}",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "catalogos",
+                    "rol",
+                    "{{id_rol}}"
+                  ]
+                },
+                "description": "Borra registro."
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "tipo_avaliador",
+          "item": [
+            {
+              "name": "GET List",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{url}}/api/catalogos/tipo_avaliador",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "catalogos",
+                    "tipo_avaliador"
+                  ]
+                },
+                "description": "Lista tipo_avaliador."
+              },
+              "response": []
+            },
+            {
+              "name": "POST Create → set {{id_tipo_avaliador}}",
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "// Genera sufijo único por ejecución (Runner-safe)",
+                      "const now = Date.now();",
+                      "pm.collectionVariables.set('uniq', String(now));"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200/201', function () {",
+                      "  pm.expect([200,201]).to.include(pm.response.code);",
+                      "});",
+                      "let data = {};",
+                      "try { data = pm.response.json(); } catch (e) { data = {}; }",
+                      "const id = data.id || data.data?.id || '';",
+                      "pm.test('ID devuelto', () => pm.expect(String(id)).to.not.equal(''));",
+                      "pm.collectionVariables.set('id_tipo_avaliador', String(id));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"codigo\": \"TEST_AVAL_{{uniq}}\",\n  \"descripcion\": \"Tipo avaliador creado por Postman\"\n}"
+                },
+                "url": {
+                  "raw": "{{url}}/api/catalogos/tipo_avaliador",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "catalogos",
+                    "tipo_avaliador"
+                  ]
+                },
+                "description": "Crea registro."
+              },
+              "response": []
+            },
+            {
+              "name": "GET By ID",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                      "pm.test('id_tipo_avaliador presente', () => pm.expect(pm.collectionVariables.get('id_tipo_avaliador')).to.not.equal(''));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{url}}/api/catalogos/tipo_avaliador/{{id_tipo_avaliador}}",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "catalogos",
+                    "tipo_avaliador",
+                    "{{id_tipo_avaliador}}"
+                  ]
+                },
+                "description": "Lee registro por id."
+              },
+              "response": []
+            },
+            {
+              "name": "PATCH Update",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"descripcion\": \"Tipo avaliador actualizado\"\n}"
+                },
+                "url": {
+                  "raw": "{{url}}/api/catalogos/tipo_avaliador/{{id_tipo_avaliador}}",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "catalogos",
+                    "tipo_avaliador",
+                    "{{id_tipo_avaliador}}"
+                  ]
+                },
+                "description": "Actualiza parcial."
+              },
+              "response": []
+            },
+            {
+              "name": "DELETE",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200/204', function () {",
+                      "  pm.expect([200,204]).to.include(pm.response.code);",
+                      "});",
+                      "pm.collectionVariables.unset('id_tipo_avaliador');"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{url}}/api/catalogos/tipo_avaliador/{{id_tipo_avaliador}}",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "catalogos",
+                    "tipo_avaliador",
+                    "{{id_tipo_avaliador}}"
+                  ]
+                },
+                "description": "Borra registro."
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "tipo_contrato",
+          "item": [
+            {
+              "name": "GET List",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{url}}/api/catalogos/tipo_contrato",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "catalogos",
+                    "tipo_contrato"
+                  ]
+                },
+                "description": "Lista tipo_contrato."
+              },
+              "response": []
+            },
+            {
+              "name": "POST Create → set {{id_tipo_contrato}}",
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "// Genera sufijo único por ejecución (Runner-safe)",
+                      "const now = Date.now();",
+                      "pm.collectionVariables.set('uniq', String(now));"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200/201', function () {",
+                      "  pm.expect([200,201]).to.include(pm.response.code);",
+                      "});",
+                      "let data = {};",
+                      "try { data = pm.response.json(); } catch (e) { data = {}; }",
+                      "const id = data.id || data.data?.id || '';",
+                      "pm.test('ID devuelto', () => pm.expect(String(id)).to.not.equal(''));",
+                      "pm.collectionVariables.set('id_tipo_contrato', String(id));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"codigo\": \"TEST_TCON_{{uniq}}\",\n  \"descripcion\": \"Tipo contrato creado por Postman\"\n}"
+                },
+                "url": {
+                  "raw": "{{url}}/api/catalogos/tipo_contrato",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "catalogos",
+                    "tipo_contrato"
+                  ]
+                },
+                "description": "Crea registro."
+              },
+              "response": []
+            },
+            {
+              "name": "GET By ID",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                      "pm.test('id_tipo_contrato presente', () => pm.expect(pm.collectionVariables.get('id_tipo_contrato')).to.not.equal(''));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{url}}/api/catalogos/tipo_contrato/{{id_tipo_contrato}}",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "catalogos",
+                    "tipo_contrato",
+                    "{{id_tipo_contrato}}"
+                  ]
+                },
+                "description": "Lee registro por id."
+              },
+              "response": []
+            },
+            {
+              "name": "PATCH Update",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"descripcion\": \"Tipo contrato actualizado\"\n}"
+                },
+                "url": {
+                  "raw": "{{url}}/api/catalogos/tipo_contrato/{{id_tipo_contrato}}",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "catalogos",
+                    "tipo_contrato",
+                    "{{id_tipo_contrato}}"
+                  ]
+                },
+                "description": "Actualiza parcial."
+              },
+              "response": []
+            },
+            {
+              "name": "DELETE",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200/204', function () {",
+                      "  pm.expect([200,204]).to.include(pm.response.code);",
+                      "});",
+                      "pm.collectionVariables.unset('id_tipo_contrato');"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{url}}/api/catalogos/tipo_contrato/{{id_tipo_contrato}}",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "catalogos",
+                    "tipo_contrato",
+                    "{{id_tipo_contrato}}"
+                  ]
+                },
+                "description": "Borra registro."
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "tipo_derecho_propiedad",
+          "item": [
+            {
+              "name": "GET List",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{url}}/api/catalogos/tipo_derecho_propiedad",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "catalogos",
+                    "tipo_derecho_propiedad"
+                  ]
+                },
+                "description": "Lista tipo_derecho_propiedad."
+              },
+              "response": []
+            },
+            {
+              "name": "POST Create → set {{id_tipo_derecho_propiedad}}",
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "// Genera sufijo único por ejecución (Runner-safe)",
+                      "const now = Date.now();",
+                      "pm.collectionVariables.set('uniq', String(now));"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200/201', function () {",
+                      "  pm.expect([200,201]).to.include(pm.response.code);",
+                      "});",
+                      "let data = {};",
+                      "try { data = pm.response.json(); } catch (e) { data = {}; }",
+                      "const id = data.id || data.data?.id || '';",
+                      "pm.test('ID devuelto', () => pm.expect(String(id)).to.not.equal(''));",
+                      "pm.collectionVariables.set('id_tipo_derecho_propiedad', String(id));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"codigo\": \"TEST_TDP_{{uniq}}\",\n  \"descripcion\": \"Tipo derecho propiedad creado por Postman\"\n}"
+                },
+                "url": {
+                  "raw": "{{url}}/api/catalogos/tipo_derecho_propiedad",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "catalogos",
+                    "tipo_derecho_propiedad"
+                  ]
+                },
+                "description": "Crea registro."
+              },
+              "response": []
+            },
+            {
+              "name": "GET By ID",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                      "pm.test('id_tipo_derecho_propiedad presente', () => pm.expect(pm.collectionVariables.get('id_tipo_derecho_propiedad')).to.not.equal(''));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{url}}/api/catalogos/tipo_derecho_propiedad/{{id_tipo_derecho_propiedad}}",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "catalogos",
+                    "tipo_derecho_propiedad",
+                    "{{id_tipo_derecho_propiedad}}"
+                  ]
+                },
+                "description": "Lee registro por id."
+              },
+              "response": []
+            },
+            {
+              "name": "PATCH Update",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"descripcion\": \"Tipo derecho propiedad actualizado\"\n}"
+                },
+                "url": {
+                  "raw": "{{url}}/api/catalogos/tipo_derecho_propiedad/{{id_tipo_derecho_propiedad}}",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "catalogos",
+                    "tipo_derecho_propiedad",
+                    "{{id_tipo_derecho_propiedad}}"
+                  ]
+                },
+                "description": "Actualiza parcial."
+              },
+              "response": []
+            },
+            {
+              "name": "DELETE",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200/204', function () {",
+                      "  pm.expect([200,204]).to.include(pm.response.code);",
+                      "});",
+                      "pm.collectionVariables.unset('id_tipo_derecho_propiedad');"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{url}}/api/catalogos/tipo_derecho_propiedad/{{id_tipo_derecho_propiedad}}",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "catalogos",
+                    "tipo_derecho_propiedad",
+                    "{{id_tipo_derecho_propiedad}}"
+                  ]
+                },
+                "description": "Borra registro."
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "tipo_ingreso",
+          "item": [
+            {
+              "name": "GET List",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{url}}/api/catalogos/tipo_ingreso",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "catalogos",
+                    "tipo_ingreso"
+                  ]
+                },
+                "description": "Lista tipo_ingreso."
+              },
+              "response": []
+            },
+            {
+              "name": "POST Create → set {{id_tipo_ingreso}}",
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "// Genera sufijo único por ejecución (Runner-safe)",
+                      "const now = Date.now();",
+                      "pm.collectionVariables.set('uniq', String(now));"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200/201', function () {",
+                      "  pm.expect([200,201]).to.include(pm.response.code);",
+                      "});",
+                      "let data = {};",
+                      "try { data = pm.response.json(); } catch (e) { data = {}; }",
+                      "const id = data.id || data.data?.id || '';",
+                      "pm.test('ID devuelto', () => pm.expect(String(id)).to.not.equal(''));",
+                      "pm.collectionVariables.set('id_tipo_ingreso', String(id));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"codigo\": \"TEST_TING_{{uniq}}\",\n  \"descripcion\": \"Tipo ingreso creado por Postman\"\n}"
+                },
+                "url": {
+                  "raw": "{{url}}/api/catalogos/tipo_ingreso",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "catalogos",
+                    "tipo_ingreso"
+                  ]
+                },
+                "description": "Crea registro."
+              },
+              "response": []
+            },
+            {
+              "name": "GET By ID",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                      "pm.test('id_tipo_ingreso presente', () => pm.expect(pm.collectionVariables.get('id_tipo_ingreso')).to.not.equal(''));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{url}}/api/catalogos/tipo_ingreso/{{id_tipo_ingreso}}",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "catalogos",
+                    "tipo_ingreso",
+                    "{{id_tipo_ingreso}}"
+                  ]
+                },
+                "description": "Lee registro por id."
+              },
+              "response": []
+            },
+            {
+              "name": "PATCH Update",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"descripcion\": \"Tipo ingreso actualizado\"\n}"
+                },
+                "url": {
+                  "raw": "{{url}}/api/catalogos/tipo_ingreso/{{id_tipo_ingreso}}",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "catalogos",
+                    "tipo_ingreso",
+                    "{{id_tipo_ingreso}}"
+                  ]
+                },
+                "description": "Actualiza parcial."
+              },
+              "response": []
+            },
+            {
+              "name": "DELETE",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200/204', function () {",
+                      "  pm.expect([200,204]).to.include(pm.response.code);",
+                      "});",
+                      "pm.collectionVariables.unset('id_tipo_ingreso');"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{url}}/api/catalogos/tipo_ingreso/{{id_tipo_ingreso}}",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "catalogos",
+                    "tipo_ingreso",
+                    "{{id_tipo_ingreso}}"
+                  ]
+                },
+                "description": "Borra registro."
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "tipo_estancia (cat_tipo_estancia)",
+          "item": [
+            {
+              "name": "GET List",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{url}}/api/catalogos/tipo_estancia",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "catalogos",
+                    "tipo_estancia"
+                  ]
+                },
+                "description": "Lista tipo_estancia."
+              },
+              "response": []
+            },
+            {
+              "name": "POST Create → set {{id_tipo_estancia}}",
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "// Genera sufijo único por ejecución (Runner-safe)",
+                      "const now = Date.now();",
+                      "pm.collectionVariables.set('uniq', String(now));"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200/201', function () {",
+                      "  pm.expect([200,201]).to.include(pm.response.code);",
+                      "});",
+                      "let data = {};",
+                      "try { data = pm.response.json(); } catch (e) { data = {}; }",
+                      "const id = data.id || data.data?.id || '';",
+                      "pm.test('ID devuelto', () => pm.expect(String(id)).to.not.equal(''));",
+                      "pm.collectionVariables.set('id_tipo_estancia', String(id));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"codigo\": \"TEST_EST_{{uniq}}\",\n  \"descripcion\": \"Tipo estancia creado por Postman\",\n  \"alquilable\": false,\n  \"es_raiz\": false\n}"
+                },
+                "url": {
+                  "raw": "{{url}}/api/catalogos/tipo_estancia",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "catalogos",
+                    "tipo_estancia"
+                  ]
+                },
+                "description": "Crea registro."
+              },
+              "response": []
+            },
+            {
+              "name": "GET By ID",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                      "pm.test('id_tipo_estancia presente', () => pm.expect(pm.collectionVariables.get('id_tipo_estancia')).to.not.equal(''));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{url}}/api/catalogos/tipo_estancia/{{id_tipo_estancia}}",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "catalogos",
+                    "tipo_estancia",
+                    "{{id_tipo_estancia}}"
+                  ]
+                },
+                "description": "Lee registro por id."
+              },
+              "response": []
+            },
+            {
+              "name": "PATCH Update",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"descripcion\": \"Tipo estancia actualizado\",\n  \"alquilable\": true\n}"
+                },
+                "url": {
+                  "raw": "{{url}}/api/catalogos/tipo_estancia/{{id_tipo_estancia}}",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "catalogos",
+                    "tipo_estancia",
+                    "{{id_tipo_estancia}}"
+                  ]
+                },
+                "description": "Actualiza parcial."
+              },
+              "response": []
+            },
+            {
+              "name": "DELETE",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200/204', function () {",
+                      "  pm.expect([200,204]).to.include(pm.response.code);",
+                      "});",
+                      "pm.collectionVariables.unset('id_tipo_estancia');"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{url}}/api/catalogos/tipo_estancia/{{id_tipo_estancia}}",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "catalogos",
+                    "tipo_estancia",
+                    "{{id_tipo_estancia}}"
+                  ]
+                },
+                "description": "Borra registro."
+              },
+              "response": []
+            }
+          ],
+          "description": "Catálogo especial: codigo/descripcion + flags alquilable/es_raiz."
+        }
+      ],
+      "description": "Catálogos simples: CRUD básico.\n\nComentario:\n- Para todos: LIST (GET), CREATE (POST), GET by id, UPDATE (PATCH), DELETE."
+    },
+    {
+      "name": "20 · Catálogos jerárquicos",
+      "item": [
+        {
+          "name": "pais + provincia (flujo jerárquico)",
+          "item": [
+            {
+              "name": "pais · POST Create → set {{pais_id}}",
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "// Genera iso2 único (dos letras) y nombre único",
+                      "const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';",
+                      "const a = letters[Math.floor(Math.random()*letters.length)];",
+                      "const b = letters[Math.floor(Math.random()*letters.length)];",
+                      "pm.collectionVariables.set('pais_iso2', a+b);",
+                      "pm.collectionVariables.set('pais_nombre', 'PAIS TEST ' + Date.now());"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200/201', function () {",
+                      "  pm.expect([200,201]).to.include(pm.response.code);",
+                      "});",
+                      "let data = {};",
+                      "try { data = pm.response.json(); } catch (e) { data = {}; }",
+                      "const id = data.id || data.data?.id || '';",
+                      "pm.test('ID devuelto', () => pm.expect(String(id)).to.not.equal(''));",
+                      "pm.collectionVariables.set('pais_id', String(id));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"iso2\": \"{{pais_iso2}}\",\n  \"nombre\": \"{{pais_nombre}}\"\n}"
+                },
+                "url": {
+                  "raw": "{{url}}/api/catalogos/pais",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "catalogos",
+                    "pais"
+                  ]
+                },
+                "description": "Crea registro."
+              },
+              "response": []
+            },
+            {
+              "name": "provincia · GET List (filtrado por pais_id)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{url}}/api/catalogos/provincia?pais_id={{pais_id}}",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "catalogos",
+                    "provincia"
+                  ],
+                  "query": [
+                    {
+                      "key": "pais_id",
+                      "value": "{{pais_id}}"
+                    }
+                  ]
+                },
+                "description": "Lista provincias filtradas por país (pais_id)."
+              },
+              "response": []
+            },
+            {
+              "name": "provincia · POST Create → set {{id_provincia}}",
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "// Genera sufijo único por ejecución (Runner-safe)",
+                      "const now = Date.now();",
+                      "pm.collectionVariables.set('uniq', String(now));"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200/201', function () {",
+                      "  pm.expect([200,201]).to.include(pm.response.code);",
+                      "});",
+                      "let data = {};",
+                      "try { data = pm.response.json(); } catch (e) { data = {}; }",
+                      "const id = data.id || data.data?.id || '';",
+                      "pm.test('ID devuelto', () => pm.expect(String(id)).to.not.equal(''));",
+                      "pm.collectionVariables.set('id_provincia', String(id));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"pais_id\": {{pais_id}},\n  \"nombre\": \"PROVINCIA TEST {{uniq}}\"\n}"
+                },
+                "url": {
+                  "raw": "{{url}}/api/catalogos/provincia",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "catalogos",
+                    "provincia"
+                  ]
+                },
+                "description": "Crea provincia (requiere pais_id)."
+              },
+              "response": []
+            },
+            {
+              "name": "provincia · GET By ID",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                      "pm.test('id_provincia presente', () => pm.expect(pm.collectionVariables.get('id_provincia')).to.not.equal(''));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{url}}/api/catalogos/provincia/{{id_provincia}}",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "catalogos",
+                    "provincia",
+                    "{{id_provincia}}"
+                  ]
+                },
+                "description": "Lee registro por id."
+              },
+              "response": []
+            },
+            {
+              "name": "provincia · PATCH Update",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"nombre\": \"PROVINCIA TEST {{uniq}} (upd)\"\n}"
+                },
+                "url": {
+                  "raw": "{{url}}/api/catalogos/provincia/{{id_provincia}}",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "catalogos",
+                    "provincia",
+                    "{{id_provincia}}"
+                  ]
+                },
+                "description": "Actualiza parcial."
+              },
+              "response": []
+            },
+            {
+              "name": "provincia · DELETE",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200/204', function () {",
+                      "  pm.expect([200,204]).to.include(pm.response.code);",
+                      "});",
+                      "pm.collectionVariables.unset('id_provincia');"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{url}}/api/catalogos/provincia/{{id_provincia}}",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "catalogos",
+                    "provincia",
+                    "{{id_provincia}}"
+                  ]
+                },
+                "description": "Borra provincia."
+              },
+              "response": []
+            },
+            {
+              "name": "pais · GET By ID",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                      "pm.test('pais_id presente', () => pm.expect(pm.collectionVariables.get('pais_id')).to.not.equal(''));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{url}}/api/catalogos/pais/{{pais_id}}",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "catalogos",
+                    "pais",
+                    "{{pais_id}}"
+                  ]
+                },
+                "description": "Lee registro por id."
+              },
+              "response": []
+            },
+            {
+              "name": "pais · PATCH Update",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"nombre\": \"{{pais_nombre}} (upd)\"\n}"
+                },
+                "url": {
+                  "raw": "{{url}}/api/catalogos/pais/{{pais_id}}",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "catalogos",
+                    "pais",
+                    "{{pais_id}}"
+                  ]
+                },
+                "description": "Actualiza parcial."
+              },
+              "response": []
+            },
+            {
+              "name": "pais · GET List",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{url}}/api/catalogos/pais",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "catalogos",
+                    "pais"
+                  ]
+                },
+                "description": "Lista pais."
+              },
+              "response": []
+            },
+            {
+              "name": "pais · DELETE (cleanup, ejecutar al final)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200/204', function () {",
+                      "  pm.expect([200,204]).to.include(pm.response.code);",
+                      "});",
+                      "pm.collectionVariables.unset('pais_id');"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{url}}/api/catalogos/pais/{{pais_id}}",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "catalogos",
+                    "pais",
+                    "{{pais_id}}"
+                  ]
+                },
+                "description": "Borra país. IMPORTANTE: ejecutar solo después de borrar provincias (FK)."
+              },
+              "response": []
+            }
+          ],
+          "description": "Ejecución en orden para respetar FK: crea país → CRUD provincia → valida/actualiza país → borra provincia → borra país."
+        }
+      ],
+      "description": "Jerárquicos:\n- provincia depende de pais\n- provincia siempre filtrado por pais seleccionado"
+    }
+  ],
+  "variable": [
+    {
+      "key": "url",
+      "value": "http://localhost:8000",
+      "type": "string"
+    },
+    {
+      "key": "admin_email",
+      "value": "admin@proparcon.es",
+      "type": "string"
+    },
+    {
+      "key": "admin_password",
+      "value": "admin",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "uniq",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "pais_iso2",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "pais_nombre",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}

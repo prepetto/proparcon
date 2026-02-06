@@ -1,0 +1,529 @@
+{
+  "info": {
+    "_postman_id": "32853af0-e4eb-4781-adff-b17d0c0f6c4c",
+    "name": "PROPARCON Entidades",
+    "description": "Ciclo completo de 16 tests. Limpieza secuencial: 11-Contrato, 12-Inquilinos.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "47630111",
+    "_collection_link": "https://go.postman.co/collection/47630111-32853af0-e4eb-4781-adff-b17d0c0f6c4c?source=collection_link"
+  },
+  "item": [
+    {
+      "name": "01 - Login Admin",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var jsonData = pm.response.json();",
+              "pm.environment.set(\"token\", jsonData.access_token);",
+              "pm.test(\"Login OK\", function () { pm.response.to.have.status(200); });"
+            ],
+            "type": "text/javascript",
+            "packages": {},
+            "requests": {}
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"email\": \"admin@proparcon.es\", \"password\": \"admin\"}"
+        },
+        "url": {
+          "raw": "{{url}}/v1/auth/login",
+          "host": [
+            "{{url}}"
+          ],
+          "path": [
+            "v1",
+            "auth",
+            "login"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "02 - Crear Inmueble",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var jsonData = pm.response.json();",
+              "pm.environment.set(\"last_inmueble_id\", jsonData.id);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"tipo_inmueble_id\": 1, \"nombre_publico\": \"Inmueble Test\", \"direccion_id\": 1, \"referencia_catastral\": \"REF-{{$randomInt}}\"}"
+        },
+        "url": {
+          "raw": "{{url}}/api/inmueble",
+          "host": [
+            "{{url}}"
+          ],
+          "path": [
+            "api",
+            "inmueble"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "03 - Crear Estancia",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var jsonData = pm.response.json();",
+              "pm.environment.set(\"last_estancia_id\", jsonData.id);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"inmueble_id\": {{last_inmueble_id}}, \"tipo_estancia_id\": 1, \"nombre\": \"Salon V4\"}"
+        },
+        "url": {
+          "raw": "{{url}}/api/estancia",
+          "host": [
+            "{{url}}"
+          ],
+          "path": [
+            "api",
+            "estancia"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "04 - Crear Persona",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var jsonData = pm.response.json();",
+              "pm.environment.set(\"last_persona_id\", jsonData.id);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"tipo_doc\": \"DNI\", \"doc_identidad\": \"T-{{$randomInt}}\", \"nombre\": \"Juan\", \"apellido1\": \"Test\"}"
+        },
+        "url": {
+          "raw": "{{url}}/api/persona",
+          "host": [
+            "{{url}}"
+          ],
+          "path": [
+            "api",
+            "persona"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "05 - Crear Oferta",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var jsonData = pm.response.json();",
+              "pm.environment.set(\"last_oferta_id\", jsonData.id);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"estancia_id\": {{last_estancia_id}}, \"renta_mensual\": 500.0, \"fecha_alta\": \"2025-01-01\", \"estado_id\": 1}"
+        },
+        "url": {
+          "raw": "{{url}}/api/oferta",
+          "host": [
+            "{{url}}"
+          ],
+          "path": [
+            "api",
+            "oferta"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "06 - Crear Contrato",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var jsonData = pm.response.json();",
+              "pm.environment.set(\"last_contrato_id\", jsonData.id);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"payload\": {\"estancia_id\": {{last_estancia_id}}, \"oferta_id\": {{last_oferta_id}}, \"fecha_inicio\": \"2025-02-01\", \"monto_renta\": 500.0}, \"inquilinos\": [{\"id\": {{last_persona_id}}}]}"
+        },
+        "url": {
+          "raw": "{{url}}/api/contrato",
+          "host": [
+            "{{url}}"
+          ],
+          "path": [
+            "api",
+            "contrato"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "07 - Leer Inmueble",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{url}}/api/inmueble/{{last_inmueble_id}}",
+          "host": [
+            "{{url}}"
+          ],
+          "path": [
+            "api",
+            "inmueble",
+            "{{last_inmueble_id}}"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "08 - Leer Oferta",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{url}}/api/oferta/{{last_oferta_id}}",
+          "host": [
+            "{{url}}"
+          ],
+          "path": [
+            "api",
+            "oferta",
+            "{{last_oferta_id}}"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "09 - Leer Contrato",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{url}}/api/contrato/{{last_contrato_id}}",
+          "host": [
+            "{{url}}"
+          ],
+          "path": [
+            "api",
+            "contrato",
+            "{{last_contrato_id}}"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "10 - Actualizar Inmueble",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"nombre_publico\": \"Inmueble Editado V4\"}"
+        },
+        "url": {
+          "raw": "{{url}}/api/inmueble/{{last_inmueble_id}}",
+          "host": [
+            "{{url}}"
+          ],
+          "path": [
+            "api",
+            "inmueble",
+            "{{last_inmueble_id}}"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "11 - Borrar Contrato",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{url}}/api/contrato/{{last_contrato_id}}",
+          "host": [
+            "{{url}}"
+          ],
+          "path": [
+            "api",
+            "contrato",
+            "{{last_contrato_id}}"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "12 - Borrar Inquilinos",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{url}}/api/contrato/{{last_contrato_id}}/inquilinos",
+          "host": [
+            "{{url}}"
+          ],
+          "path": [
+            "api",
+            "contrato",
+            "{{last_contrato_id}}",
+            "inquilinos"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "13 - Borrar Oferta",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{url}}/api/oferta/{{last_oferta_id}}",
+          "host": [
+            "{{url}}"
+          ],
+          "path": [
+            "api",
+            "oferta",
+            "{{last_oferta_id}}"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "14 - Borrar Persona",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{url}}/api/persona/{{last_persona_id}}",
+          "host": [
+            "{{url}}"
+          ],
+          "path": [
+            "api",
+            "persona",
+            "{{last_persona_id}}"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "15 - Borrar Estancia",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{url}}/api/estancia/{{last_estancia_id}}",
+          "host": [
+            "{{url}}"
+          ],
+          "path": [
+            "api",
+            "estancia",
+            "{{last_estancia_id}}"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "16 - Borrar Inmueble Final",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{url}}/api/inmueble/{{last_inmueble_id}}",
+          "host": [
+            "{{url}}"
+          ],
+          "path": [
+            "api",
+            "inmueble",
+            "{{last_inmueble_id}}"
+          ]
+        }
+      },
+      "response": []
+    }
+  ]
+}
