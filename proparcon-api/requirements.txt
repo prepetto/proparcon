@@ -1,0 +1,25 @@
+# --- Core Framework & Servidor ---
+fastapi==0.111.0
+uvicorn[standard]==0.30.1
+pydantic-settings==2.3.4
+python-multipart==0.0.9
+starlette==0.37.2
+httpx==0.27.0
+
+# --- Base de Datos (ORM & Drivers) ---
+SQLAlchemy==2.0.31
+psycopg2-binary==2.9.9   
+asyncpg==0.29.0           
+greenlet==3.0.3           
+alembic==1.13.2
+
+# --- Seguridad y JWT ---
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+bcrypt==3.2.2
+PyJWT==2.8.0
+cryptography==42.0.8
+
+# --- Utilidades ---
+python-dotenv==1.0.1
+pydantic==2.7.4

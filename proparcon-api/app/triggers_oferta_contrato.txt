@@ -1,0 +1,8 @@
+SET
+             trigger             |       tabla       |                                                                                              definicion                                                                                              
+---------------------------------+-------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ ctr_contrato_tiene_inquilino    | alquiler_contrato | CREATE CONSTRAINT TRIGGER ctr_contrato_tiene_inquilino AFTER INSERT OR UPDATE ON alquiler_contrato DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION trg_assert_contrato_tiene_inquilino()
+ trg_exclusion_alquiler_contrato | alquiler_contrato | CREATE TRIGGER trg_exclusion_alquiler_contrato BEFORE INSERT OR UPDATE ON alquiler_contrato FOR EACH ROW EXECUTE FUNCTION trg_check_exclusion_alquiler()
+ trg_exclusion_alquiler_oferta   | alquiler_oferta   | CREATE TRIGGER trg_exclusion_alquiler_oferta BEFORE INSERT OR UPDATE ON alquiler_oferta FOR EACH ROW EXECUTE FUNCTION trg_check_exclusion_alquiler()
+(3 rows)
+

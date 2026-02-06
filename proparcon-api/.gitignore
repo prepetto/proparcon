@@ -1,0 +1,25 @@
+# Entornos virtuales
+.venv/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Variables de entorno (NO subir secretos)
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+
+# Node / frontend (por si acaso)
+node_modules/
+
+# Alembic cache
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
+db/liquibase/drivers/*.jar

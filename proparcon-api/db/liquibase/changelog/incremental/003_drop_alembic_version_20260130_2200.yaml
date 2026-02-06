@@ -1,0 +1,23 @@
+# -----------------------------------------------------------------------------
+# PROPARCON - Incremental ChangeSet
+# -----------------------------------------------------------------------------
+# Cambio:
+# - Eliminar la tabla proparcon.alembic_version (residuo de Alembic)
+#
+# Motivo:
+# - Alembic está abandonado. Liquibase debe ser la única fuente de versionado.
+#
+# Seguridad:
+# - dropTable con ifExists=true para idempotencia.
+# -----------------------------------------------------------------------------
+
+databaseChangeLog:
+  - changeSet:
+      id: 003-drop-alembic-version-20260130-2200
+      author: proparcon
+      changes:
+        - dropTable:
+            schemaName: proparcon
+            tableName: alembic_version
+            cascadeConstraints: true
+            ifExists: true

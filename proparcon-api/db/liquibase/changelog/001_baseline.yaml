@@ -1,0 +1,6 @@
+databaseChangeLog:
+  - changeSet:
+      id: placeholder-baseline
+      author: proparcon
+      changes:
+        - comment: "Placeholder temporal. Sustituir por el baseline real (001_baseline.yaml generado)."

@@ -1,0 +1,1035 @@
+CREATE OR REPLACE PROCEDURE proparcon.sp_demo_final(IN p_oferta_inicio date DEFAULT '2025-11-01'::date, IN p_oferta_fin date DEFAULT NULL::date, IN p_oferta_renta numeric DEFAULT 850, IN p_contrato_inicio date DEFAULT '2025-12-01'::date, IN p_contrato_fin date DEFAULT NULL::date, IN p_contrato_renta numeric DEFAULT 900)
+ LANGUAGE plpgsql
+AS $procedure$
+DECLARE
+  -- Objetos principales de la demo
+  v_estancia    bigint;   -- estancia objetivo (id=6 si existe; si no, la primera)
+  v_inmueble    bigint;   -- inmueble asociado a la estancia objetivo
+  v_contrato    bigint;   -- contrato demo insertado/seleccionado
+  v_persona     bigint;   -- persona demo a asociar como inquilino
+
+  -- Mecanismos de asociación de inquilino
+  v_col_inq     text;     -- columna directa (si existe)
+  v_tbl_p1      regclass := to_regclass('proparcon.alquiler_contrato_inquilino');   -- (contrato_id, persona_id)
+  v_tbl_p2      regclass := to_regclass('proparcon.alquiler_contrato_persona');     -- (contrato_id, persona_id, rol)
+
+  -- Auxiliares
+  v_count_est   int;
+BEGIN
+  -- ============================================================
+  -- 1) Saneamiento de rangos incoherentes (no romper CHECKs)
+  --    - Alinea fecha_baja < fecha_alta → fecha_baja = fecha_alta
+  --    - Alinea fecha_fin < fecha_inicio → fecha_fin = fecha_inicio y activo = FALSE
+  -- ============================================================
+  UPDATE proparcon.alquiler_oferta
+     SET fecha_baja = fecha_alta
+   WHERE fecha_baja IS NOT NULL AND fecha_baja < fecha_alta;
+
+  UPDATE proparcon.alquiler_contrato
+     SET fecha_fin = fecha_inicio, activo = FALSE
+   WHERE fecha_fin IS NOT NULL AND fecha_fin < fecha_inicio;
+
+  -- ============================================================
+  -- 2) Garantizar inmueble + estancia
+  --    - Si no hay estancias, intenta crear inmueble por defecto y una estancia.
+  --    - Si tu tabla inmueble tiene NOT NULLs obligatorios, lanza error claro.
+  -- ============================================================
+  SELECT COUNT(*) INTO v_count_est FROM proparcon.estancia;
+  IF v_count_est = 0 THEN
+    BEGIN
+      INSERT INTO proparcon.inmueble DEFAULT VALUES RETURNING id INTO v_inmueble;
+    EXCEPTION
+      WHEN not_null_violation THEN
+        RAISE EXCEPTION 'sp_demo_final: no se pudo crear un inmueble con DEFAULT VALUES (NOT NULL requerido). Crea manualmente un inmueble con sus campos obligatorios y vuelve a ejecutar.';
+      WHEN OTHERS THEN
+        RAISE EXCEPTION 'sp_demo_final: error creando inmueble por defecto (%). Crea uno manualmente y reintenta.', SQLERRM;
+    END;
+
+    BEGIN
+      INSERT INTO proparcon.estancia (inmueble_id) VALUES (v_inmueble);
+    EXCEPTION
+      WHEN not_null_violation THEN
+        RAISE EXCEPTION 'sp_demo_final: no se pudo crear estancia por defecto (NOT NULL en estancia). Indica columnas requeridas.';
+      WHEN OTHERS THEN
+        RAISE EXCEPTION 'sp_demo_final: error creando estancia por defecto (%).', SQLERRM;
+    END;
+  END IF;
+
+  -- ============================================================
+  -- 3) Estancia objetivo: id=6 si existe; si no, la primera
+  -- ============================================================
+  SELECT COALESCE((SELECT 6 WHERE EXISTS (SELECT 1 FROM proparcon.estancia WHERE id=6)),
+                  (SELECT MIN(id) FROM proparcon.estancia))
+  INTO v_estancia;
+
+  -- Inmueble de la estancia objetivo
+  SELECT inmueble_id INTO v_inmueble
+  FROM proparcon.estancia
+  WHERE id = v_estancia;
+
+  -- ============================================================
+  -- 4) Cerrar activos HOY a nivel de inmueble (seguro para CHECKs)
+  --    - Ofertas: fecha_baja = COALESCE(fecha_baja, ayer) si siguen activas hoy
+  --    - Contratos: fecha_fin = COALESCE(fecha_fin, ayer), activo = FALSE si siguen activos hoy
+  -- ============================================================
+  UPDATE proparcon.alquiler_oferta o
+     SET fecha_baja = COALESCE(o.fecha_baja, CURRENT_DATE - 1)
+   WHERE o.estancia_id IN (SELECT id FROM proparcon.estancia WHERE inmueble_id = v_inmueble)
+     AND COALESCE(o.fecha_baja, DATE '9999-12-31') >= CURRENT_DATE;
+
+  UPDATE proparcon.alquiler_contrato c
+     SET fecha_fin = COALESCE(c.fecha_fin, CURRENT_DATE - 1),
+         activo    = FALSE
+   WHERE c.estancia_id IN (SELECT id FROM proparcon.estancia WHERE inmueble_id = v_inmueble)
+     AND COALESCE(c.fecha_fin, DATE '9999-12-31') >= CURRENT_DATE;
+
+  -- ============================================================
+  -- 5) Insertar OFERTA demo (idempotente por solape de rangos)
+  -- ============================================================
+  INSERT INTO proparcon.alquiler_oferta (estancia_id, fecha_alta, fecha_baja, renta_mensual)
+  SELECT v_estancia, p_oferta_inicio, p_oferta_fin, p_oferta_renta
+  WHERE NOT EXISTS (
+    SELECT 1
+    FROM proparcon.alquiler_oferta o
+    WHERE o.estancia_id = v_estancia
+      AND daterange(o.fecha_alta, COALESCE(o.fecha_baja, DATE '9999-12-31'), '[]')
+          && daterange(p_oferta_inicio, COALESCE(p_oferta_fin, DATE '9999-12-31'), '[]')
+  );
+
+  -- ============================================================
+  -- 6) Insertar CONTRATO demo (idempotente) como INACTIVO
+  --    - Luego se asocia inquilino y se activa
+  -- ============================================================
+  INSERT INTO proparcon.alquiler_contrato (estancia_id, fecha_inicio, fecha_fin, renta_mensual, activo)
+  SELECT v_estancia, p_contrato_inicio, p_contrato_fin, p_contrato_renta, FALSE
+  WHERE NOT EXISTS (
+    SELECT 1
+    FROM proparcon.alquiler_contrato c
+    WHERE c.estancia_id = v_estancia
+      AND daterange(c.fecha_inicio, COALESCE(c.fecha_fin, DATE '9999-12-31'), '[]')
+          && daterange(p_contrato_inicio, COALESCE(p_contrato_fin, DATE '9999-12-31'), '[]')
+  );
+
+  -- Localizar el contrato de demo
+  SELECT id INTO v_contrato
+  FROM proparcon.alquiler_contrato
+  WHERE estancia_id = v_estancia
+    AND fecha_inicio = p_contrato_inicio
+  ORDER BY id DESC
+  LIMIT 1;
+
+  IF v_contrato IS NULL THEN
+    RAISE EXCEPTION 'sp_demo_final: no se encontró el contrato de demo (estancia %, inicio %).', v_estancia, p_contrato_inicio;
+  END IF;
+
+  -- ============================================================
+  -- 7) Persona demo (o la primera existente)
+  --    - Si tu tabla persona tiene NOT NULLs, puedes adaptar aquí valores por defecto
+  -- ============================================================
+  SELECT id INTO v_persona
+  FROM proparcon.persona
+  ORDER BY id
+  LIMIT 1;
+
+  IF v_persona IS NULL THEN
+    BEGIN
+      INSERT INTO proparcon.persona DEFAULT VALUES RETURNING id INTO v_persona;
+    EXCEPTION
+      WHEN not_null_violation THEN
+        RAISE EXCEPTION 'sp_demo_final: no se pudo crear persona demo con DEFAULT VALUES (NOT NULL). Indica columnas requeridas y reintenta.';
+      WHEN OTHERS THEN
+        RAISE EXCEPTION 'sp_demo_final: error creando persona demo (%).', SQLERRM;
+    END;
+  END IF;
+
+  -- ============================================================
+  -- 8) Asociar INQUILINO al contrato
+  --    - Prioridad: tabla puente v1 → tabla puente v2 → columna directa
+  -- ============================================================
+  SELECT CASE
+           WHEN EXISTS (SELECT 1 FROM information_schema.columns
+                        WHERE table_schema='proparcon'
+                          AND table_name='alquiler_contrato'
+                          AND column_name='inquilino_persona_id')    THEN 'inquilino_persona_id'
+           WHEN EXISTS (SELECT 1 FROM information_schema.columns
+                        WHERE table_schema='proparcon'
+                          AND table_name='alquiler_contrato'
+                          AND column_name='arrendatario_persona_id') THEN 'arrendatario_persona_id'
+           ELSE NULL
+         END
+  INTO v_col_inq;
+
+  IF v_tbl_p1 IS NOT NULL THEN
+    INSERT INTO proparcon.alquiler_contrato_inquilino (contrato_id, persona_id)
+    SELECT v_contrato, v_persona
+    WHERE NOT EXISTS (
+      SELECT 1
+      FROM proparcon.alquiler_contrato_inquilino
+      WHERE contrato_id = v_contrato
+        AND persona_id  = v_persona
+    );
+
+  ELSIF v_tbl_p2 IS NOT NULL THEN
+    INSERT INTO proparcon.alquiler_contrato_persona (contrato_id, persona_id, rol)
+    SELECT v_contrato, v_persona, 'inquilino'
+    WHERE NOT EXISTS (
+      SELECT 1
+      FROM proparcon.alquiler_contrato_persona
+      WHERE contrato_id = v_contrato
+        AND persona_id  = v_persona
+        AND (rol = 'inquilino' OR rol IS NULL)
+    );
+
+  ELSIF v_col_inq IS NOT NULL THEN
+    EXECUTE format('UPDATE proparcon.alquiler_contrato SET %I = $1 WHERE id = $2', v_col_inq)
+    USING v_persona, v_contrato;
+
+  ELSE
+    -- Si no hay forma de asociar inquilino, no activamos para no violar triggers
+    RAISE NOTICE 'sp_demo_final: no hay tabla puente ni columna directa para inquilinos; el contrato quedará INACTIVO.';
+    RETURN;
+  END IF;
+
+  -- ============================================================
+  -- 9) Activar contrato (ya con ≥1 inquilino asociado)
+  -- ============================================================
+  UPDATE proparcon.alquiler_contrato
+     SET activo = TRUE
+   WHERE id = v_contrato;
+
+  RAISE NOTICE 'DEMO FINAL OK · Estancia % · Contrato % · Inquilino %',
+               v_estancia, v_contrato, v_persona;
+END;
+$procedure$
+
+CREATE OR REPLACE PROCEDURE proparcon.sp_demo_more_data()
+ LANGUAGE plpgsql
+AS $procedure$
+DECLARE
+  -- Fechas objetivo
+  v_oferta_fecha date := DATE '2026-01-10';
+  v_ctr_inicio   date := DATE '2026-02-01';
+
+  -- Inmuebles candidatos (libres)
+  v_inmA bigint;  -- para oferta
+  v_inmB bigint;  -- para contrato
+
+  -- Estancias objetivo (nuevas o fallback a existentes)
+  v_estA bigint;
+  v_estB bigint;
+
+  -- Persona demo
+  v_pers bigint;
+
+  -- Contrato B
+  v_contratoB bigint;
+
+  -- Asociación
+  v_tbl_p1 regclass := to_regclass('proparcon.alquiler_contrato_inquilino');
+  v_tbl_p2 regclass := to_regclass('proparcon.alquiler_contrato_persona');
+  v_col_inq text;
+
+  v_has_final boolean := (to_regprocedure('proparcon.sp_demo_final()') IS NOT NULL);
+BEGIN
+  -- 0) Asegurar base mínima (si no hay inmuebles)
+  IF NOT EXISTS (SELECT 1 FROM proparcon.inmueble) THEN
+    IF v_has_final THEN
+      CALL proparcon.sp_demo_final();
+    END IF;
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM proparcon.inmueble) THEN
+    RAISE NOTICE 'MORE_DATA: no hay inmuebles; se omiten escenarios.';
+    RETURN;
+  END IF;
+
+  -- 1) Buscar inmueble libre para v_oferta_fecha
+  WITH inm_libres AS (
+    SELECT i.id
+    FROM proparcon.inmueble i
+    WHERE NOT EXISTS (
+      SELECT 1 FROM proparcon.estancia e
+      JOIN proparcon.alquiler_oferta o ON o.estancia_id = e.id
+      WHERE e.inmueble_id = i.id
+        AND daterange(o.fecha_alta, COALESCE(o.fecha_baja, DATE '9999-12-31'), '[]') @> v_oferta_fecha
+    )
+    AND NOT EXISTS (
+      SELECT 1 FROM proparcon.estancia e
+      JOIN proparcon.alquiler_contrato c ON c.estancia_id = e.id
+      WHERE e.inmueble_id = i.id
+        AND daterange(c.fecha_inicio, COALESCE(c.fecha_fin, DATE '9999-12-31'), '[]') @> v_oferta_fecha
+    )
+    ORDER BY i.id
+  )
+  SELECT id INTO v_inmA FROM inm_libres LIMIT 1;
+
+  IF v_inmA IS NULL THEN
+    RAISE NOTICE 'MORE_DATA: sin inmueble libre para OFERTA en %; omito escenario A.', v_oferta_fecha;
+  END IF;
+
+  -- 2) Buscar inmueble libre para v_ctr_inicio (distinto de A si hay)
+  WITH inm_libres AS (
+    SELECT i.id
+    FROM proparcon.inmueble i
+    WHERE NOT EXISTS (
+      SELECT 1 FROM proparcon.estancia e
+      JOIN proparcon.alquiler_oferta o ON o.estancia_id = e.id
+      WHERE e.inmueble_id = i.id
+        AND daterange(o.fecha_alta, COALESCE(o.fecha_baja, DATE '9999-12-31'), '[]') @> v_ctr_inicio
+    )
+    AND NOT EXISTS (
+      SELECT 1 FROM proparcon.estancia e
+      JOIN proparcon.alquiler_contrato c ON c.estancia_id = e.id
+      WHERE e.inmueble_id = i.id
+        AND daterange(c.fecha_inicio, COALESCE(c.fecha_fin, DATE '9999-12-31'), '[]') @> v_ctr_inicio
+    )
+    ORDER BY i.id
+  )
+  SELECT id INTO v_inmB FROM inm_libres
+  WHERE (v_inmA IS NULL OR id <> v_inmA)
+  LIMIT 1;
+
+  IF v_inmB IS NULL THEN
+    RAISE NOTICE 'MORE_DATA: sin inmueble libre para CONTRATO en %; omito escenario B.', v_ctr_inicio;
+  END IF;
+
+  IF v_inmA IS NULL AND v_inmB IS NULL THEN
+    RAISE NOTICE 'MORE_DATA: no hay hueco libre en inmuebles; no se inserta nada.';
+    RETURN;
+  END IF;
+
+  -- 3) Estancia A (crear o fallback)
+  IF v_inmA IS NOT NULL THEN
+    BEGIN
+      INSERT INTO proparcon.estancia (inmueble_id)
+      VALUES (v_inmA)
+      RETURNING id INTO v_estA;
+    EXCEPTION WHEN not_null_violation THEN
+      SELECT id INTO v_estA
+      FROM proparcon.estancia
+      WHERE inmueble_id = v_inmA
+      ORDER BY id
+      LIMIT 1;
+      IF v_estA IS NULL THEN
+        RAISE NOTICE 'MORE_DATA: sin estancia utilizable en inmueble % (A); omito escenario A.', v_inmA;
+      END IF;
+    END;
+  END IF;
+
+  -- 4) Estancia B (crear o fallback)
+  IF v_inmB IS NOT NULL THEN
+    BEGIN
+      INSERT INTO proparcon.estancia (inmueble_id)
+      VALUES (v_inmB)
+      RETURNING id INTO v_estB;
+    EXCEPTION WHEN not_null_violation THEN
+      SELECT id INTO v_estB
+      FROM proparcon.estancia
+      WHERE inmueble_id = v_inmB
+      ORDER BY id
+      LIMIT 1;
+      IF v_estB IS NULL THEN
+        RAISE NOTICE 'MORE_DATA: sin estancia utilizable en inmueble % (B); omito escenario B.', v_inmB;
+      END IF;
+    END;
+  END IF;
+
+  IF v_estA IS NULL AND v_estB IS NULL THEN
+    RAISE NOTICE 'MORE_DATA: no hay estancias objetivo; no se inserta nada.';
+    RETURN;
+  END IF;
+
+  -- 5) Escenario A: OFERTA (con guarda a nivel INMUEBLE + try/catch)
+  IF v_estA IS NOT NULL THEN
+    BEGIN
+      INSERT INTO proparcon.alquiler_oferta (estancia_id, fecha_alta, fecha_baja, renta_mensual)
+      SELECT v_estA, v_oferta_fecha, NULL, 700
+      WHERE NOT EXISTS (  -- idempotencia por estancia+fecha exacta
+        SELECT 1 FROM proparcon.alquiler_oferta
+        WHERE estancia_id = v_estA
+          AND fecha_alta   = v_oferta_fecha
+      )
+      AND NOT EXISTS (   -- GUARDA: inmueble libre para esa fecha (ofertas y contratos)
+        SELECT 1
+        FROM proparcon.estancia e2
+        JOIN proparcon.alquiler_oferta o2 ON o2.estancia_id = e2.id
+        WHERE e2.inmueble_id = (SELECT inmueble_id FROM proparcon.estancia WHERE id = v_estA)
+          AND daterange(o2.fecha_alta, COALESCE(o2.fecha_baja, DATE '9999-12-31'), '[]') @> v_oferta_fecha
+      )
+      AND NOT EXISTS (
+        SELECT 1
+        FROM proparcon.estancia e3
+        JOIN proparcon.alquiler_contrato c2 ON c2.estancia_id = e3.id
+        WHERE e3.inmueble_id = (SELECT inmueble_id FROM proparcon.estancia WHERE id = v_estA)
+          AND daterange(c2.fecha_inicio, COALESCE(c2.fecha_fin, DATE '9999-12-31'), '[]') @> v_oferta_fecha
+      );
+    EXCEPTION WHEN OTHERS THEN
+      RAISE NOTICE 'MORE_DATA(A): se omitió la oferta por exclusión/trigger: %', SQLERRM;
+    END;
+  END IF;
+
+  -- 6) Escenario B: CONTRATO (idempotente, inactivo; guarda + try/catch)
+  IF v_estB IS NOT NULL THEN
+    BEGIN
+      INSERT INTO proparcon.alquiler_contrato (estancia_id, fecha_inicio, fecha_fin, renta_mensual, activo)
+      SELECT v_estB, v_ctr_inicio, NULL, 950, FALSE
+      WHERE NOT EXISTS (  -- idempotencia por estancia+fecha exacta
+        SELECT 1 FROM proparcon.alquiler_contrato
+        WHERE estancia_id = v_estB
+          AND fecha_inicio = v_ctr_inicio
+      )
+      AND NOT EXISTS (   -- GUARDA: inmueble libre para esa fecha (ofertas y contratos)
+        SELECT 1
+        FROM proparcon.estancia e2
+        JOIN proparcon.alquiler_oferta o2 ON o2.estancia_id = e2.id
+        WHERE e2.inmueble_id = (SELECT inmueble_id FROM proparcon.estancia WHERE id = v_estB)
+          AND daterange(o2.fecha_alta, COALESCE(o2.fecha_baja, DATE '9999-12-31'), '[]') @> v_ctr_inicio
+      )
+      AND NOT EXISTS (
+        SELECT 1
+        FROM proparcon.estancia e3
+        JOIN proparcon.alquiler_contrato c2 ON c2.estancia_id = e3.id
+        WHERE e3.inmueble_id = (SELECT inmueble_id FROM proparcon.estancia WHERE id = v_estB)
+          AND daterange(c2.fecha_inicio, COALESCE(c2.fecha_fin, DATE '9999-12-31'), '[]') @> v_ctr_inicio
+      );
+    EXCEPTION WHEN OTHERS THEN
+      RAISE NOTICE 'MORE_DATA(B): se omitió el contrato por exclusión/trigger: %', SQLERRM;
+    END;
+  END IF;
+
+  -- 7) Si no se generó contrato B, terminar (escenario A pudo quedar OK)
+  SELECT id INTO v_contratoB
+  FROM proparcon.alquiler_contrato
+  WHERE estancia_id = v_estB
+    AND fecha_inicio = v_ctr_inicio
+  ORDER BY id DESC
+  LIMIT 1;
+
+  IF v_contratoB IS NULL THEN
+    RAISE NOTICE 'MORE_DATA: escenario A=% (estancia=%). Escenario B omitido.',
+                 (v_estA IS NOT NULL), v_estA;
+    RETURN;
+  END IF;
+
+  -- 8) Persona demo (o la primera)
+  SELECT id INTO v_pers FROM proparcon.persona ORDER BY id LIMIT 1;
+  IF v_pers IS NULL THEN
+    INSERT INTO proparcon.persona DEFAULT VALUES RETURNING id INTO v_pers;
+  END IF;
+
+  -- 9) Asociar inquilino (puente1 → puente2 → columna directa)
+  SELECT CASE
+           WHEN EXISTS (SELECT 1 FROM information_schema.columns
+                        WHERE table_schema='proparcon' AND table_name='alquiler_contrato'
+                          AND column_name='inquilino_persona_id')    THEN 'inquilino_persona_id'
+           WHEN EXISTS (SELECT 1 FROM information_schema.columns
+                        WHERE table_schema='proparcon' AND table_name='alquiler_contrato'
+                          AND column_name='arrendatario_persona_id') THEN 'arrendatario_persona_id'
+           ELSE NULL
+         END INTO v_col_inq;
+
+  IF v_tbl_p1 IS NOT NULL THEN
+    INSERT INTO proparcon.alquiler_contrato_inquilino (contrato_id, persona_id)
+    SELECT v_contratoB, v_pers
+    WHERE NOT EXISTS (
+      SELECT 1 FROM proparcon.alquiler_contrato_inquilino
+      WHERE contrato_id = v_contratoB AND persona_id = v_pers
+    );
+  ELSIF v_tbl_p2 IS NOT NULL THEN
+    INSERT INTO proparcon.alquiler_contrato_persona (contrato_id, persona_id, rol)
+    SELECT v_contratoB, v_pers, 'inquilino'
+    WHERE NOT EXISTS (
+      SELECT 1 FROM proparcon.alquiler_contrato_persona
+      WHERE contrato_id = v_contratoB
+        AND persona_id  = v_pers
+        AND (rol = 'inquilino' OR rol IS NULL)
+    );
+  ELSIF v_col_inq IS NOT NULL THEN
+    EXECUTE format('UPDATE proparcon.alquiler_contrato SET %I=$1 WHERE id=$2', v_col_inq)
+    USING v_pers, v_contratoB;
+  ELSE
+    RAISE NOTICE 'MORE_DATA: sin mecanismo de asociación de inquilino; contrato permanece INACTIVO.';
+    RETURN;
+  END IF;
+
+  -- 10) Activar contrato B
+  UPDATE proparcon.alquiler_contrato SET activo = TRUE WHERE id = v_contratoB;
+
+  -- 11) Log final
+  RAISE NOTICE 'MORE_DATA OK · InmuebleA=%(EstanciaA=%) · InmuebleB=%(EstanciaB=%, ContratoB=%)',
+               v_inmA, v_estA, v_inmB, v_estB, v_contratoB;
+END;
+$procedure$
+
+CREATE OR REPLACE FUNCTION proparcon.trg_check_propiedades_100()
+ RETURNS trigger
+ LANGUAGE plpgsql
+AS $function$
+DECLARE
+  v_inmueble bigint;
+  v_sum_usufructo numeric(7,2);
+  v_sum_nuda numeric(7,2);
+  v_sum_pleno numeric(7,2);
+BEGIN
+  IF TG_OP = 'DELETE' THEN v_inmueble := OLD.inmueble_id; ELSE v_inmueble := NEW.inmueble_id; END IF;
+
+  SELECT COALESCE(SUM(ip.porcentaje),0) INTO v_sum_usufructo
+  FROM proparcon.inmueble_propiedad ip
+  JOIN proparcon.cat_tipo_derecho_propiedad t ON t.id = ip.tipo_derecho_id
+  WHERE ip.inmueble_id = v_inmueble AND t.codigo = 'USUFRUCTO';
+
+  SELECT COALESCE(SUM(ip.porcentaje),0) INTO v_sum_nuda
+  FROM proparcon.inmueble_propiedad ip
+  JOIN proparcon.cat_tipo_derecho_propiedad t ON t.id = ip.tipo_derecho_id
+  WHERE ip.inmueble_id = v_inmueble AND t.codigo = 'NUDA';
+
+  SELECT COALESCE(SUM(ip.porcentaje),0) INTO v_sum_pleno
+  FROM proparcon.inmueble_propiedad ip
+  JOIN proparcon.cat_tipo_derecho_propiedad t ON t.id = ip.tipo_derecho_id
+  WHERE ip.inmueble_id = v_inmueble AND t.codigo = 'PLENO';
+
+  IF v_sum_pleno > 100 THEN
+    RAISE EXCEPTION 'Pleno dominio (%.2f) excede 100%% en inmueble %', v_sum_pleno, v_inmueble;
+  END IF;
+  IF (v_sum_usufructo + v_sum_pleno) > 100 THEN
+    RAISE EXCEPTION 'Usufructo+Pleno (%.2f) excede 100%% en inmueble %', (v_sum_usufructo + v_sum_pleno), v_inmueble;
+  END IF;
+  IF (v_sum_nuda + v_sum_pleno) > 100 THEN
+    RAISE EXCEPTION 'Nuda+Pleno (%.2f) excede 100%% en inmueble %', (v_sum_nuda + v_sum_pleno), v_inmueble;
+  END IF;
+
+  RETURN COALESCE(NEW, OLD);
+END; $function$
+
+CREATE OR REPLACE FUNCTION proparcon.fn_inmueble_de_estancia(in_estancia_id bigint)
+ RETURNS bigint
+ LANGUAGE plpgsql
+ IMMUTABLE
+AS $function$
+DECLARE v_inmueble_id bigint;
+BEGIN
+  SELECT e.inmueble_id INTO v_inmueble_id FROM proparcon.estancia e WHERE e.id = in_estancia_id;
+  RETURN v_inmueble_id;
+END; $function$
+
+CREATE OR REPLACE FUNCTION proparcon.trg_assert_contrato_tiene_inquilino_titular()
+ RETURNS trigger
+ LANGUAGE plpgsql
+AS $function$
+DECLARE 
+  v_count int;
+  v_activo_id int;
+BEGIN
+  -- 1. Obtener el ID del estado 'ACTIVO'
+  SELECT id INTO v_activo_id FROM proparcon.cat_estado_contrato WHERE codigo = 'ACTIVO';
+
+  -- 2. Solo ejecutar el chequeo si el nuevo estado es 'ACTIVO'
+  IF NEW.estado_id = v_activo_id THEN
+    -- Contamos inquilinos que tienen es_titular = TRUE.
+    SELECT COUNT(*) INTO v_count
+    FROM proparcon.alquiler_contrato_inquilino i
+    WHERE i.contrato_id = NEW.id
+      AND i.es_titular IS TRUE;
+
+    IF v_count < 1 THEN
+      RAISE EXCEPTION 'El contrato debe tener al menos un inquilino titular para pasar a ACTIVO.'
+        USING HINT = 'Regla de Negocio (3. Reglas de Negocio): Un contrato ACTIVO requiere un titular.';
+    END IF;
+  END IF; -- Si no es ACTIVO, la función retorna sin hacer nada.
+  
+  RETURN NEW;
+END; $function$
+
+CREATE OR REPLACE FUNCTION proparcon.trg_check_exclusion_alquiler_estancia()
+ RETURNS trigger
+ LANGUAGE plpgsql
+AS $function$
+DECLARE
+  v_estancia bigint;
+  v_count int;
+  v_activo_id int;
+BEGIN
+  v_estancia := NEW.estancia_id;
+  SELECT id INTO v_activo_id FROM proparcon.cat_estado_contrato WHERE codigo = 'ACTIVO';
+  
+  -- Solo se verifica si el nuevo estado es ACTIVO (ID 2).
+  IF NEW.estado_id = v_activo_id THEN
+    SELECT COUNT(*)
+    INTO v_count
+    FROM proparcon.alquiler_contrato ac
+    WHERE ac.estancia_id = v_estancia
+      AND ac.estado_id = v_activo_id
+      AND ac.id <> COALESCE(NEW.id, 0);
+
+    IF v_count > 0 THEN
+      RAISE EXCEPTION 'Ya existe un contrato ACTIVO en la estancia %.', v_estancia
+        USING HINT = 'La regla de negocio (2. Reglas de Negocio) impide dos contratos ACTIVO en la misma estancia.';
+    END IF;
+  END IF;
+  
+  RETURN NEW;
+END; $function$
+
+CREATE OR REPLACE PROCEDURE proparcon.sp_demo_final(IN p_oferta_inicio date DEFAULT '2025-11-01'::date, IN p_oferta_fin date DEFAULT NULL::date, IN p_oferta_renta numeric DEFAULT 850, IN p_contrato_inicio date DEFAULT '2025-12-01'::date, IN p_contrato_fin date DEFAULT NULL::date, IN p_contrato_renta numeric DEFAULT 900)
+ LANGUAGE plpgsql
+AS $procedure$
+DECLARE
+  -- Objetos principales de la demo
+  v_estancia    bigint;   -- estancia objetivo (id=6 si existe; si no, la primera)
+  v_inmueble    bigint;   -- inmueble asociado a la estancia objetivo
+  v_contrato    bigint;   -- contrato demo insertado/seleccionado
+  v_persona     bigint;   -- persona demo a asociar como inquilino
+
+  -- Mecanismos de asociación de inquilino
+  v_col_inq     text;     -- columna directa (si existe)
+  v_tbl_p1      regclass := to_regclass('proparcon.alquiler_contrato_inquilino');   -- (contrato_id, persona_id)
+  v_tbl_p2      regclass := to_regclass('proparcon.alquiler_contrato_persona');     -- (contrato_id, persona_id, rol)
+
+  -- Auxiliares
+  v_count_est   int;
+BEGIN
+  -- ============================================================
+  -- 1) Saneamiento de rangos incoherentes (no romper CHECKs)
+  --    - Alinea fecha_baja < fecha_alta → fecha_baja = fecha_alta
+  --    - Alinea fecha_fin < fecha_inicio → fecha_fin = fecha_inicio y activo = FALSE
+  -- ============================================================
+  UPDATE proparcon.alquiler_oferta
+     SET fecha_baja = fecha_alta
+   WHERE fecha_baja IS NOT NULL AND fecha_baja < fecha_alta;
+
+  UPDATE proparcon.alquiler_contrato
+     SET fecha_fin = fecha_inicio, activo = FALSE
+   WHERE fecha_fin IS NOT NULL AND fecha_fin < fecha_inicio;
+
+  -- ============================================================
+  -- 2) Garantizar inmueble + estancia
+  --    - Si no hay estancias, intenta crear inmueble por defecto y una estancia.
+  --    - Si tu tabla inmueble tiene NOT NULLs obligatorios, lanza error claro.
+  -- ============================================================
+  SELECT COUNT(*) INTO v_count_est FROM proparcon.estancia;
+  IF v_count_est = 0 THEN
+    BEGIN
+      INSERT INTO proparcon.inmueble DEFAULT VALUES RETURNING id INTO v_inmueble;
+    EXCEPTION
+      WHEN not_null_violation THEN
+        RAISE EXCEPTION 'sp_demo_final: no se pudo crear un inmueble con DEFAULT VALUES (NOT NULL requerido). Crea manualmente un inmueble con sus campos obligatorios y vuelve a ejecutar.';
+      WHEN OTHERS THEN
+        RAISE EXCEPTION 'sp_demo_final: error creando inmueble por defecto (%). Crea uno manualmente y reintenta.', SQLERRM;
+    END;
+
+    BEGIN
+      INSERT INTO proparcon.estancia (inmueble_id) VALUES (v_inmueble);
+    EXCEPTION
+      WHEN not_null_violation THEN
+        RAISE EXCEPTION 'sp_demo_final: no se pudo crear estancia por defecto (NOT NULL en estancia). Indica columnas requeridas.';
+      WHEN OTHERS THEN
+        RAISE EXCEPTION 'sp_demo_final: error creando estancia por defecto (%).', SQLERRM;
+    END;
+  END IF;
+
+  -- ============================================================
+  -- 3) Estancia objetivo: id=6 si existe; si no, la primera
+  -- ============================================================
+  SELECT COALESCE((SELECT 6 WHERE EXISTS (SELECT 1 FROM proparcon.estancia WHERE id=6)),
+                  (SELECT MIN(id) FROM proparcon.estancia))
+  INTO v_estancia;
+
+  -- Inmueble de la estancia objetivo
+  SELECT inmueble_id INTO v_inmueble
+  FROM proparcon.estancia
+  WHERE id = v_estancia;
+
+  -- ============================================================
+  -- 4) Cerrar activos HOY a nivel de inmueble (seguro para CHECKs)
+  --    - Ofertas: fecha_baja = COALESCE(fecha_baja, ayer) si siguen activas hoy
+  --    - Contratos: fecha_fin = COALESCE(fecha_fin, ayer), activo = FALSE si siguen activos hoy
+  -- ============================================================
+  UPDATE proparcon.alquiler_oferta o
+     SET fecha_baja = COALESCE(o.fecha_baja, CURRENT_DATE - 1)
+   WHERE o.estancia_id IN (SELECT id FROM proparcon.estancia WHERE inmueble_id = v_inmueble)
+     AND COALESCE(o.fecha_baja, DATE '9999-12-31') >= CURRENT_DATE;
+
+  UPDATE proparcon.alquiler_contrato c
+     SET fecha_fin = COALESCE(c.fecha_fin, CURRENT_DATE - 1),
+         activo    = FALSE
+   WHERE c.estancia_id IN (SELECT id FROM proparcon.estancia WHERE inmueble_id = v_inmueble)
+     AND COALESCE(c.fecha_fin, DATE '9999-12-31') >= CURRENT_DATE;
+
+  -- ============================================================
+  -- 5) Insertar OFERTA demo (idempotente por solape de rangos)
+  -- ============================================================
+  INSERT INTO proparcon.alquiler_oferta (estancia_id, fecha_alta, fecha_baja, renta_mensual)
+  SELECT v_estancia, p_oferta_inicio, p_oferta_fin, p_oferta_renta
+  WHERE NOT EXISTS (
+    SELECT 1
+    FROM proparcon.alquiler_oferta o
+    WHERE o.estancia_id = v_estancia
+      AND daterange(o.fecha_alta, COALESCE(o.fecha_baja, DATE '9999-12-31'), '[]')
+          && daterange(p_oferta_inicio, COALESCE(p_oferta_fin, DATE '9999-12-31'), '[]')
+  );
+
+  -- ============================================================
+  -- 6) Insertar CONTRATO demo (idempotente) como INACTIVO
+  --    - Luego se asocia inquilino y se activa
+  -- ============================================================
+  INSERT INTO proparcon.alquiler_contrato (estancia_id, fecha_inicio, fecha_fin, renta_mensual, activo)
+  SELECT v_estancia, p_contrato_inicio, p_contrato_fin, p_contrato_renta, FALSE
+  WHERE NOT EXISTS (
+    SELECT 1
+    FROM proparcon.alquiler_contrato c
+    WHERE c.estancia_id = v_estancia
+      AND daterange(c.fecha_inicio, COALESCE(c.fecha_fin, DATE '9999-12-31'), '[]')
+          && daterange(p_contrato_inicio, COALESCE(p_contrato_fin, DATE '9999-12-31'), '[]')
+  );
+
+  -- Localizar el contrato de demo
+  SELECT id INTO v_contrato
+  FROM proparcon.alquiler_contrato
+  WHERE estancia_id = v_estancia
+    AND fecha_inicio = p_contrato_inicio
+  ORDER BY id DESC
+  LIMIT 1;
+
+  IF v_contrato IS NULL THEN
+    RAISE EXCEPTION 'sp_demo_final: no se encontró el contrato de demo (estancia %, inicio %).', v_estancia, p_contrato_inicio;
+  END IF;
+
+  -- ============================================================
+  -- 7) Persona demo (o la primera existente)
+  --    - Si tu tabla persona tiene NOT NULLs, puedes adaptar aquí valores por defecto
+  -- ============================================================
+  SELECT id INTO v_persona
+  FROM proparcon.persona
+  ORDER BY id
+  LIMIT 1;
+
+  IF v_persona IS NULL THEN
+    BEGIN
+      INSERT INTO proparcon.persona DEFAULT VALUES RETURNING id INTO v_persona;
+    EXCEPTION
+      WHEN not_null_violation THEN
+        RAISE EXCEPTION 'sp_demo_final: no se pudo crear persona demo con DEFAULT VALUES (NOT NULL). Indica columnas requeridas y reintenta.';
+      WHEN OTHERS THEN
+        RAISE EXCEPTION 'sp_demo_final: error creando persona demo (%).', SQLERRM;
+    END;
+  END IF;
+
+  -- ============================================================
+  -- 8) Asociar INQUILINO al contrato
+  --    - Prioridad: tabla puente v1 → tabla puente v2 → columna directa
+  -- ============================================================
+  SELECT CASE
+           WHEN EXISTS (SELECT 1 FROM information_schema.columns
+                        WHERE table_schema='proparcon'
+                          AND table_name='alquiler_contrato'
+                          AND column_name='inquilino_persona_id')    THEN 'inquilino_persona_id'
+           WHEN EXISTS (SELECT 1 FROM information_schema.columns
+                        WHERE table_schema='proparcon'
+                          AND table_name='alquiler_contrato'
+                          AND column_name='arrendatario_persona_id') THEN 'arrendatario_persona_id'
+           ELSE NULL
+         END
+  INTO v_col_inq;
+
+  IF v_tbl_p1 IS NOT NULL THEN
+    INSERT INTO proparcon.alquiler_contrato_inquilino (contrato_id, persona_id)
+    SELECT v_contrato, v_persona
+    WHERE NOT EXISTS (
+      SELECT 1
+      FROM proparcon.alquiler_contrato_inquilino
+      WHERE contrato_id = v_contrato
+        AND persona_id  = v_persona
+    );
+
+  ELSIF v_tbl_p2 IS NOT NULL THEN
+    INSERT INTO proparcon.alquiler_contrato_persona (contrato_id, persona_id, rol)
+    SELECT v_contrato, v_persona, 'inquilino'
+    WHERE NOT EXISTS (
+      SELECT 1
+      FROM proparcon.alquiler_contrato_persona
+      WHERE contrato_id = v_contrato
+        AND persona_id  = v_persona
+        AND (rol = 'inquilino' OR rol IS NULL)
+    );
+
+  ELSIF v_col_inq IS NOT NULL THEN
+    EXECUTE format('UPDATE proparcon.alquiler_contrato SET %I = $1 WHERE id = $2', v_col_inq)
+    USING v_persona, v_contrato;
+
+  ELSE
+    -- Si no hay forma de asociar inquilino, no activamos para no violar triggers
+    RAISE NOTICE 'sp_demo_final: no hay tabla puente ni columna directa para inquilinos; el contrato quedará INACTIVO.';
+    RETURN;
+  END IF;
+
+  -- ============================================================
+  -- 9) Activar contrato (ya con ≥1 inquilino asociado)
+  -- ============================================================
+  UPDATE proparcon.alquiler_contrato
+     SET activo = TRUE
+   WHERE id = v_contrato;
+
+  RAISE NOTICE 'DEMO FINAL OK · Estancia % · Contrato % · Inquilino %',
+               v_estancia, v_contrato, v_persona;
+END;
+$procedure$
+
+CREATE OR REPLACE PROCEDURE proparcon.sp_demo_more_data()
+ LANGUAGE plpgsql
+AS $procedure$
+DECLARE
+  -- Fechas objetivo
+  v_oferta_fecha date := DATE '2026-01-10';
+  v_ctr_inicio   date := DATE '2026-02-01';
+
+  -- Inmuebles candidatos (libres)
+  v_inmA bigint;  -- para oferta
+  v_inmB bigint;  -- para contrato
+
+  -- Estancias objetivo (nuevas o fallback a existentes)
+  v_estA bigint;
+  v_estB bigint;
+
+  -- Persona demo
+  v_pers bigint;
+
+  -- Contrato B
+  v_contratoB bigint;
+
+  -- Asociación
+  v_tbl_p1 regclass := to_regclass('proparcon.alquiler_contrato_inquilino');
+  v_tbl_p2 regclass := to_regclass('proparcon.alquiler_contrato_persona');
+  v_col_inq text;
+
+  v_has_final boolean := (to_regprocedure('proparcon.sp_demo_final()') IS NOT NULL);
+BEGIN
+  -- 0) Asegurar base mínima (si no hay inmuebles)
+  IF NOT EXISTS (SELECT 1 FROM proparcon.inmueble) THEN
+    IF v_has_final THEN
+      CALL proparcon.sp_demo_final();
+    END IF;
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM proparcon.inmueble) THEN
+    RAISE NOTICE 'MORE_DATA: no hay inmuebles; se omiten escenarios.';
+    RETURN;
+  END IF;
+
+  -- 1) Buscar inmueble libre para v_oferta_fecha
+  WITH inm_libres AS (
+    SELECT i.id
+    FROM proparcon.inmueble i
+    WHERE NOT EXISTS (
+      SELECT 1 FROM proparcon.estancia e
+      JOIN proparcon.alquiler_oferta o ON o.estancia_id = e.id
+      WHERE e.inmueble_id = i.id
+        AND daterange(o.fecha_alta, COALESCE(o.fecha_baja, DATE '9999-12-31'), '[]') @> v_oferta_fecha
+    )
+    AND NOT EXISTS (
+      SELECT 1 FROM proparcon.estancia e
+      JOIN proparcon.alquiler_contrato c ON c.estancia_id = e.id
+      WHERE e.inmueble_id = i.id
+        AND daterange(c.fecha_inicio, COALESCE(c.fecha_fin, DATE '9999-12-31'), '[]') @> v_oferta_fecha
+    )
+    ORDER BY i.id
+  )
+  SELECT id INTO v_inmA FROM inm_libres LIMIT 1;
+
+  IF v_inmA IS NULL THEN
+    RAISE NOTICE 'MORE_DATA: sin inmueble libre para OFERTA en %; omito escenario A.', v_oferta_fecha;
+  END IF;
+
+  -- 2) Buscar inmueble libre para v_ctr_inicio (distinto de A si hay)
+  WITH inm_libres AS (
+    SELECT i.id
+    FROM proparcon.inmueble i
+    WHERE NOT EXISTS (
+      SELECT 1 FROM proparcon.estancia e
+      JOIN proparcon.alquiler_oferta o ON o.estancia_id = e.id
+      WHERE e.inmueble_id = i.id
+        AND daterange(o.fecha_alta, COALESCE(o.fecha_baja, DATE '9999-12-31'), '[]') @> v_ctr_inicio
+    )
+    AND NOT EXISTS (
+      SELECT 1 FROM proparcon.estancia e
+      JOIN proparcon.alquiler_contrato c ON c.estancia_id = e.id
+      WHERE e.inmueble_id = i.id
+        AND daterange(c.fecha_inicio, COALESCE(c.fecha_fin, DATE '9999-12-31'), '[]') @> v_ctr_inicio
+    )
+    ORDER BY i.id
+  )
+  SELECT id INTO v_inmB FROM inm_libres
+  WHERE (v_inmA IS NULL OR id <> v_inmA)
+  LIMIT 1;
+
+  IF v_inmB IS NULL THEN
+    RAISE NOTICE 'MORE_DATA: sin inmueble libre para CONTRATO en %; omito escenario B.', v_ctr_inicio;
+  END IF;
+
+  IF v_inmA IS NULL AND v_inmB IS NULL THEN
+    RAISE NOTICE 'MORE_DATA: no hay hueco libre en inmuebles; no se inserta nada.';
+    RETURN;
+  END IF;
+
+  -- 3) Estancia A (crear o fallback)
+  IF v_inmA IS NOT NULL THEN
+    BEGIN
+      INSERT INTO proparcon.estancia (inmueble_id)
+      VALUES (v_inmA)
+      RETURNING id INTO v_estA;
+    EXCEPTION WHEN not_null_violation THEN
+      SELECT id INTO v_estA
+      FROM proparcon.estancia
+      WHERE inmueble_id = v_inmA
+      ORDER BY id
+      LIMIT 1;
+      IF v_estA IS NULL THEN
+        RAISE NOTICE 'MORE_DATA: sin estancia utilizable en inmueble % (A); omito escenario A.', v_inmA;
+      END IF;
+    END;
+  END IF;
+
+  -- 4) Estancia B (crear o fallback)
+  IF v_inmB IS NOT NULL THEN
+    BEGIN
+      INSERT INTO proparcon.estancia (inmueble_id)
+      VALUES (v_inmB)
+      RETURNING id INTO v_estB;
+    EXCEPTION WHEN not_null_violation THEN
+      SELECT id INTO v_estB
+      FROM proparcon.estancia
+      WHERE inmueble_id = v_inmB
+      ORDER BY id
+      LIMIT 1;
+      IF v_estB IS NULL THEN
+        RAISE NOTICE 'MORE_DATA: sin estancia utilizable en inmueble % (B); omito escenario B.', v_inmB;
+      END IF;
+    END;
+  END IF;
+
+  IF v_estA IS NULL AND v_estB IS NULL THEN
+    RAISE NOTICE 'MORE_DATA: no hay estancias objetivo; no se inserta nada.';
+    RETURN;
+  END IF;
+
+  -- 5) Escenario A: OFERTA (con guarda a nivel INMUEBLE + try/catch)
+  IF v_estA IS NOT NULL THEN
+    BEGIN
+      INSERT INTO proparcon.alquiler_oferta (estancia_id, fecha_alta, fecha_baja, renta_mensual)
+      SELECT v_estA, v_oferta_fecha, NULL, 700
+      WHERE NOT EXISTS (  -- idempotencia por estancia+fecha exacta
+        SELECT 1 FROM proparcon.alquiler_oferta
+        WHERE estancia_id = v_estA
+          AND fecha_alta   = v_oferta_fecha
+      )
+      AND NOT EXISTS (   -- GUARDA: inmueble libre para esa fecha (ofertas y contratos)
+        SELECT 1
+        FROM proparcon.estancia e2
+        JOIN proparcon.alquiler_oferta o2 ON o2.estancia_id = e2.id
+        WHERE e2.inmueble_id = (SELECT inmueble_id FROM proparcon.estancia WHERE id = v_estA)
+          AND daterange(o2.fecha_alta, COALESCE(o2.fecha_baja, DATE '9999-12-31'), '[]') @> v_oferta_fecha
+      )
+      AND NOT EXISTS (
+        SELECT 1
+        FROM proparcon.estancia e3
+        JOIN proparcon.alquiler_contrato c2 ON c2.estancia_id = e3.id
+        WHERE e3.inmueble_id = (SELECT inmueble_id FROM proparcon.estancia WHERE id = v_estA)
+          AND daterange(c2.fecha_inicio, COALESCE(c2.fecha_fin, DATE '9999-12-31'), '[]') @> v_oferta_fecha
+      );
+    EXCEPTION WHEN OTHERS THEN
+      RAISE NOTICE 'MORE_DATA(A): se omitió la oferta por exclusión/trigger: %', SQLERRM;
+    END;
+  END IF;
+
+  -- 6) Escenario B: CONTRATO (idempotente, inactivo; guarda + try/catch)
+  IF v_estB IS NOT NULL THEN
+    BEGIN
+      INSERT INTO proparcon.alquiler_contrato (estancia_id, fecha_inicio, fecha_fin, renta_mensual, activo)
+      SELECT v_estB, v_ctr_inicio, NULL, 950, FALSE
+      WHERE NOT EXISTS (  -- idempotencia por estancia+fecha exacta
+        SELECT 1 FROM proparcon.alquiler_contrato
+        WHERE estancia_id = v_estB
+          AND fecha_inicio = v_ctr_inicio
+      )
+      AND NOT EXISTS (   -- GUARDA: inmueble libre para esa fecha (ofertas y contratos)
+        SELECT 1
+        FROM proparcon.estancia e2
+        JOIN proparcon.alquiler_oferta o2 ON o2.estancia_id = e2.id
+        WHERE e2.inmueble_id = (SELECT inmueble_id FROM proparcon.estancia WHERE id = v_estB)
+          AND daterange(o2.fecha_alta, COALESCE(o2.fecha_baja, DATE '9999-12-31'), '[]') @> v_ctr_inicio
+      )
+      AND NOT EXISTS (
+        SELECT 1
+        FROM proparcon.estancia e3
+        JOIN proparcon.alquiler_contrato c2 ON c2.estancia_id = e3.id
+        WHERE e3.inmueble_id = (SELECT inmueble_id FROM proparcon.estancia WHERE id = v_estB)
+          AND daterange(c2.fecha_inicio, COALESCE(c2.fecha_fin, DATE '9999-12-31'), '[]') @> v_ctr_inicio
+      );
+    EXCEPTION WHEN OTHERS THEN
+      RAISE NOTICE 'MORE_DATA(B): se omitió el contrato por exclusión/trigger: %', SQLERRM;
+    END;
+  END IF;
+
+  -- 7) Si no se generó contrato B, terminar (escenario A pudo quedar OK)
+  SELECT id INTO v_contratoB
+  FROM proparcon.alquiler_contrato
+  WHERE estancia_id = v_estB
+    AND fecha_inicio = v_ctr_inicio
+  ORDER BY id DESC
+  LIMIT 1;
+
+  IF v_contratoB IS NULL THEN
+    RAISE NOTICE 'MORE_DATA: escenario A=% (estancia=%). Escenario B omitido.',
+                 (v_estA IS NOT NULL), v_estA;
+    RETURN;
+  END IF;
+
+  -- 8) Persona demo (o la primera)
+  SELECT id INTO v_pers FROM proparcon.persona ORDER BY id LIMIT 1;
+  IF v_pers IS NULL THEN
+    INSERT INTO proparcon.persona DEFAULT VALUES RETURNING id INTO v_pers;
+  END IF;
+
+  -- 9) Asociar inquilino (puente1 → puente2 → columna directa)
+  SELECT CASE
+           WHEN EXISTS (SELECT 1 FROM information_schema.columns
+                        WHERE table_schema='proparcon' AND table_name='alquiler_contrato'
+                          AND column_name='inquilino_persona_id')    THEN 'inquilino_persona_id'
+           WHEN EXISTS (SELECT 1 FROM information_schema.columns
+                        WHERE table_schema='proparcon' AND table_name='alquiler_contrato'
+                          AND column_name='arrendatario_persona_id') THEN 'arrendatario_persona_id'
+           ELSE NULL
+         END INTO v_col_inq;
+
+  IF v_tbl_p1 IS NOT NULL THEN
+    INSERT INTO proparcon.alquiler_contrato_inquilino (contrato_id, persona_id)
+    SELECT v_contratoB, v_pers
+    WHERE NOT EXISTS (
+      SELECT 1 FROM proparcon.alquiler_contrato_inquilino
+      WHERE contrato_id = v_contratoB AND persona_id = v_pers
+    );
+  ELSIF v_tbl_p2 IS NOT NULL THEN
+    INSERT INTO proparcon.alquiler_contrato_persona (contrato_id, persona_id, rol)
+    SELECT v_contratoB, v_pers, 'inquilino'
+    WHERE NOT EXISTS (
+      SELECT 1 FROM proparcon.alquiler_contrato_persona
+      WHERE contrato_id = v_contratoB
+        AND persona_id  = v_pers
+        AND (rol = 'inquilino' OR rol IS NULL)
+    );
+  ELSIF v_col_inq IS NOT NULL THEN
+    EXECUTE format('UPDATE proparcon.alquiler_contrato SET %I=$1 WHERE id=$2', v_col_inq)
+    USING v_pers, v_contratoB;
+  ELSE
+    RAISE NOTICE 'MORE_DATA: sin mecanismo de asociación de inquilino; contrato permanece INACTIVO.';
+    RETURN;
+  END IF;
+
+  -- 10) Activar contrato B
+  UPDATE proparcon.alquiler_contrato SET activo = TRUE WHERE id = v_contratoB;
+
+  -- 11) Log final
+  RAISE NOTICE 'MORE_DATA OK · InmuebleA=%(EstanciaA=%) · InmuebleB=%(EstanciaB=%, ContratoB=%)',
+               v_inmA, v_estA, v_inmB, v_estB, v_contratoB;
+END;
+$procedure$
+

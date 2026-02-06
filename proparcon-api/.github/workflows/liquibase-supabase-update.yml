@@ -1,0 +1,90 @@
+# -----------------------------------------------------------------------------
+# Liquibase Supabase Update (MANUAL)
+# -----------------------------------------------------------------------------
+# Objetivo:
+# - Aplicar cambios Liquibase contra Supabase SOLO bajo ejecución manual.
+# - Evitar ejecuciones accidentales: requiere confirmación explícita "UPDATE".
+#
+# Requisitos (GitHub Secrets):
+# - SUPABASE_DB_URL   -> jdbc:postgresql://...:5432/postgres?sslmode=require
+# - SUPABASE_DB_USER  -> postgres.<tenant>  (o el user que uses en Supabase pooler)
+# - SUPABASE_DB_PASS  -> password
+#
+# Estructura esperada del repo:
+# - db/liquibase/changelog/db.changelog-master.yaml
+# - db/liquibase/changelog/incremental/...
+# - db/liquibase/drivers/ (se crea en runtime)
+# -----------------------------------------------------------------------------
+
+name: Liquibase Supabase Update (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Escribe UPDATE para confirmar ejecución contra Supabase"
+        required: true
+        default: "NO"
+
+permissions:
+  contents: read
+
+jobs:
+  supabase_update:
+    runs-on: ubuntu-latest
+
+    steps:
+      # -----------------------------------------------------------------------
+      # 1) Checkout
+      # -----------------------------------------------------------------------
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # -----------------------------------------------------------------------
+      # 2) Guardrail: confirmación explícita
+      # -----------------------------------------------------------------------
+      - name: Guardrail (confirm must be UPDATE)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event.inputs.confirm }}" != "UPDATE" ]; then
+            echo "Bloqueado: confirm='${{ github.event.inputs.confirm }}' (debe ser UPDATE)."
+            exit 1
+          fi
+          echo "OK: confirm=UPDATE"
+
+      # -----------------------------------------------------------------------
+      # 3) Verificaciones mínimas de estructura
+      # -----------------------------------------------------------------------
+      - name: Check changelog exists
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f db/liquibase/changelog/db.changelog-master.yaml
+          echo "OK: changelog encontrado"
+
+      # -----------------------------------------------------------------------
+      # 4) Descargar driver JDBC PostgreSQL
+      # -----------------------------------------------------------------------
+      - name: Prepare Postgres JDBC driver
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p db/liquibase/drivers
+          curl -L -o db/liquibase/drivers/postgresql-42.7.3.jar \
+            https://repo1.maven.org/maven2/org/postgresql/postgresql/42.7.3/postgresql-42.7.3.jar
+          ls -la db/liquibase/drivers
+
+      # -----------------------------------------------------------------------
+      # 5) Ejecutar Liquibase UPDATE contra Supabase (inputs nativos action v7)
+      #    Nota clave: classpath ABSOLUTO dentro del workspace del runner.
+      # -----------------------------------------------------------------------
+      - name: Liquibase update (Supabase)
+        uses: liquibase/liquibase-github-action@v7
+        with:
+          operation: update
+          classpath: /github/workspace/db/liquibase/drivers/postgresql-42.7.3.jar
+          changeLogFile: db/liquibase/changelog/db.changelog-master.yaml
+          url: ${{ secrets.SUPABASE_DB_URL }}
+          username: ${{ secrets.SUPABASE_DB_USER }}
+          password: ${{ secrets.SUPABASE_DB_PASS }}

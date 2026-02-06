@@ -1,0 +1,23 @@
+# Dependencias
+node_modules
+npm-debug.log
+
+# Producción (Vite usa 'dist', CRA usa 'build')
+dist
+build
+
+# Control de versiones y Sistema
+.git
+.gitignore
+.DS_Store
+Thumbs.db
+
+# Configuración de Docker (para no copiarlos dentro de sí mismos innecesariamente)
+docker-compose*.yml
+Dockerfile*
+.dockerignore
+
+# Entorno (Mejor inyectar esto desde docker-compose que copiarlo en la imagen)
+.env
+.env.local
+.env.*

@@ -1,0 +1,18 @@
+# Dockerfile.dev (DEV con hot-reload, independiente de API y DB)
+FROM node:20-alpine
+
+# Directorio de trabajo
+WORKDIR /app
+
+# Copia manifiestos e instala dependencias (sin lockfile → npm install)
+COPY package.json package-lock.json ./
+RUN npm ci
+
+# Copia el resto del proyecto
+COPY . .
+
+# Exponer puerto de Vite
+EXPOSE 5173
+
+# Servidor de desarrollo accesible desde fuera del contenedor
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]

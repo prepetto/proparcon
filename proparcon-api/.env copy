@@ -1,0 +1,43 @@
+# POSTGRES_DB=proparcon
+# POSTGRES_USER=admin
+# POSTGRES_PASSWORD=admin
+# POSTGRES_HOST=postgres
+# POSTGRES_HOST=localhost
+# POSTGRES_PORT=5432
+# POSTGRES_SCHEMA=proparcon
+# Deja UVICORN_RELOAD vacío para producción/pruebas:
+# UVICORN_RELOAD=
+
+# =========================
+# BASE DE DATOS (POSTGRES)
+# =========================
+POSTGRES_DB=proparcon
+POSTGRES_USER=admin
+POSTGRES_PASSWORD=admin
+
+# En Docker Compose: usa el nombre del servicio (normalmente "postgres").
+# Dentro del contenedor, "localhost" NO es el contenedor de Postgres.
+POSTGRES_HOST=postgres
+
+POSTGRES_PORT=5432
+POSTGRES_SCHEMA=proparcon
+
+# =========================
+# UVICORN / DESARROLLO
+# =========================
+# Deja UVICORN_RELOAD vacío para producción/pruebas (como ya haces).
+UVICORN_RELOAD=
+
+# =========================
+# AUTH (SOLO DEV) - BYPASS ADMIN
+# =========================
+# Necesario si tu colección Postman está usando el "admin/admin" de desarrollo.
+# - Habilítalo en local. En producción debe ir a 0 o no existir.
+ADMIN_BYPASS_ENABLED=1
+
+# Pon aquí el email EXACTO con el que Postman hace login.
+# Si son varios, sepáralos por coma.
+ADMIN_BYPASS_EMAILS=admin@proparcon.es
+
+# Password que Postman manda en el login cuando usa bypass.
+ADMIN_BYPASS_PASSWORD=admin

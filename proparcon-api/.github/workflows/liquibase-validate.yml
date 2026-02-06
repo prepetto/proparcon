@@ -1,0 +1,139 @@
+# -----------------------------------------------------------------------------
+# Liquibase Validate (PR -> master) — VALIDACIÓN REAL EN CI
+# -----------------------------------------------------------------------------
+# Objetivo:
+# - Blindar el pipeline: validar que los changelogs Liquibase son coherentes
+#   (YAML correcto, includeAll correcto, rutas existentes, etc.) antes de mergear
+#   a la rama "master" (GitHub).
+#
+# Decisión técnica importante:
+# - NO usamos liquibase/liquibase-github-action@v7 para validate porque:
+#   1) no expone un input para pasar "--defaults-file"
+#   2) y en la práctica está fallando al cargar el driver JDBC (org.postgresql.Driver)
+# - En su lugar ejecutamos Liquibase CLI oficial en Docker (liquibase/liquibase)
+#   montando el repo y el jar del driver explícitamente. Cero magia, cero sorpresas.
+#
+# Qué hace:
+# - Levanta un Postgres efímero (service container) para tener URL/username/password
+#   válidos (Liquibase "validate" puede requerir conexión real según changelog).
+# - Descarga el driver JDBC Postgres en db/liquibase/drivers (si no existe).
+# - Ejecuta: liquibase validate con --classpath apuntando al jar.
+#
+# Qué NO hace:
+# - No toca Supabase.
+# - No ejecuta update. Solo validate.
+# -----------------------------------------------------------------------------
+
+name: Liquibase Validate (PR -> master)
+
+# -----------------------------------------------------------------------------
+# Triggers
+# -----------------------------------------------------------------------------
+on:
+  pull_request:
+    branches: ["master"]
+  push:
+    branches: ["master"]
+
+# -----------------------------------------------------------------------------
+# Permisos mínimos
+# -----------------------------------------------------------------------------
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    # -------------------------------------------------------------------------
+    # Job: validar changelog Liquibase
+    # -------------------------------------------------------------------------
+    runs-on: ubuntu-latest
+
+    # -------------------------------------------------------------------------
+    # 1) Servicio Postgres efímero (solo CI)
+    #    Nota: aquí NO hay secretos. Es una BD desechable.
+    # -------------------------------------------------------------------------
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: proparcon
+          POSTGRES_USER: admin
+          POSTGRES_PASSWORD: admin
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U admin -d proparcon"
+          --health-interval=5s
+          --health-timeout=3s
+          --health-retries=20
+
+    steps:
+      # -----------------------------------------------------------------------
+      # 2) Checkout del repo
+      # -----------------------------------------------------------------------
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # -----------------------------------------------------------------------
+      # 3) Debug rápido (útil cuando el runner dice que no existe /db)
+      # -----------------------------------------------------------------------
+      - name: Debug repo tree (top + db/liquibase)
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "*** Top-level:"
+          ls -la
+          echo
+          echo "*** db/liquibase (si existe):"
+          ls -la db || true
+          ls -la db/liquibase || true
+          ls -la db/liquibase/changelog || true
+          ls -la db/liquibase/drivers || true
+
+      # -----------------------------------------------------------------------
+      # 4) Preparar driver JDBC PostgreSQL (classpath)
+      # -----------------------------------------------------------------------
+      - name: Prepare Postgres driver (JDBC)
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p db/liquibase/drivers
+          if [ ! -f db/liquibase/drivers/postgresql-42.7.3.jar ]; then
+            curl -L -o db/liquibase/drivers/postgresql-42.7.3.jar \
+              https://repo1.maven.org/maven2/org/postgresql/postgresql/42.7.3/postgresql-42.7.3.jar
+          fi
+          test -f db/liquibase/drivers/postgresql-42.7.3.jar
+          echo "OK: JDBC driver listo."
+
+      # -----------------------------------------------------------------------
+      # 5) Comprobar que el changelog master existe (fallo temprano y claro)
+      # -----------------------------------------------------------------------
+      - name: Check changelog exists
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f db/liquibase/changelog/db.changelog-master.yaml
+          echo "OK: changelog encontrado."
+
+      # -----------------------------------------------------------------------
+      # 6) Ejecutar validate usando Liquibase CLI oficial (Docker)
+      #    Motivo: el wrapper action v7 estaba fallando al cargar el driver.
+      # -----------------------------------------------------------------------
+      - name: Liquibase validate (CLI Docker)
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # Liquibase CLI en Docker, montando el repo en /workspace
+          # Nota: usamos --network host para conectar a localhost:5432 del runner.
+          docker run --rm \
+            --network host \
+            -v "${PWD}:/workspace" \
+            -w /workspace \
+            liquibase/liquibase:5.0.1 \
+              --classpath=/workspace/db/liquibase/drivers/postgresql-42.7.3.jar \
+              --changeLogFile=db/liquibase/changelog/db.changelog-master.yaml \
+              --url=jdbc:postgresql://localhost:5432/proparcon \
+              --username=admin \
+              --password=admin \
+              validate

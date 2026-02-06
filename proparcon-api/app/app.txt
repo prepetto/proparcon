@@ -1,0 +1,91 @@
+Listado de rutas de carpetas para el volumen OS
+El número de serie del volumen es C4D0-4F21
+C:.
+¦   app.txt
+¦   log_arranque_api.txt
+¦   main.py
+¦   triggers_oferta_contrato.txt
+¦   trigger_fn.txt
+¦   __init__.py
+¦   
++---.pytest_cache
+¦   ¦   .gitignore
+¦   ¦   CACHEDIR.TAG
+¦   ¦   README.md
+¦   ¦   
+¦   +---v
+¦       +---cache
+¦               lastfailed
+¦               nodeids
+¦               
++---api
+¦   ¦   catalogos.py
+¦   ¦   contrato.py
+¦   ¦   deps.py
+¦   ¦   estancia.py
+¦   ¦   infra.py
+¦   ¦   inmueble.py
+¦   ¦   oferta.py
+¦   ¦   persona.py
+¦   ¦   propiedad.py
+¦   ¦   __init__.py
+¦   ¦   
+¦   +---v1
+¦   ¦   +---endpoints
+¦   ¦       ¦   auth.py
+¦   ¦       ¦   login_router.py
+¦   ¦       ¦   users.py
+¦   ¦       ¦   __init__.py
+¦   ¦       ¦   
+¦   ¦       +---__pycache__
+¦   ¦               auth.cpython-313.pyc
+¦   ¦               __init__.cpython-313.pyc
+¦   ¦               
+¦   +---__pycache__
+¦           contrato.cpython-313.pyc
+¦           estancia.cpython-313.pyc
+¦           infra.cpython-313.pyc
+¦           inmueble.cpython-313.pyc
+¦           oferta.cpython-313.pyc
+¦           persona.cpython-313.pyc
+¦           __init__.cpython-313.pyc
+¦           
++---auth
+¦   ¦   auth_bearer.py
+¦   ¦   __init__.py
+¦   ¦   
+¦   +---__pycache__
+¦           auth_bearer.cpython-313.pyc
+¦           __init__.cpython-313.pyc
+¦           
++---core
+¦   ¦   auth_deps.py
+¦   ¦   db.py
+¦   ¦   dependencies.py
+¦   ¦   security.py
+¦   ¦   settings.py
+¦   ¦   
+¦   +---__pycache__
+¦           db.cpython-313.pyc
+¦           dependencies.cpython-313.pyc
+¦           security.cpython-313.pyc
+¦           settings.cpython-313.pyc
+¦           
++---models
+¦   ¦   base.py
+¦   ¦   users.py
+¦   ¦   
+¦   +---__pycache__
+¦           users.cpython-313.pyc
+¦           
++---routers
+¦       api.py
+¦       
++---schemas
+¦       auth.py
+¦       users.py
+¦       
++---__pycache__
+        main.cpython-313.pyc
+        __init__.cpython-313.pyc
+        

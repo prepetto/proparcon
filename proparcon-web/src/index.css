@@ -1,0 +1,61 @@
+/**
+ * ============================================================================
+ * GLOBAL STYLES (index.css)
+ * ============================================================================
+ * Función: Define el diseño base usando Tailwind CSS y crea clases personalizadas
+ * para componentes reutilizables como tarjetas, botones y tablas.
+ * ============================================================================
+ */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+  /* Tarjetas de contenedor */
+  .card {
+    @apply rounded-xl border border-slate-200 bg-white p-6 shadow-sm;
+  }
+
+  /* Etiquetas de formulario */
+  .label {
+    @apply text-sm font-medium text-slate-600 mb-1 block;
+  }
+
+  /* Entradas de texto y selectores */
+  .input {
+    @apply mt-1 w-full border border-slate-300 rounded-lg px-4 py-2 
+           focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none
+           transition-all duration-200 bg-white;
+  }
+
+  /* Botón Principal (Negro/Azul) */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 
+           font-medium text-white transition-colors duration-200
+           hover:bg-slate-700 active:scale-95 disabled:opacity-50;
+  }
+
+  /* Botón Secundario (Blanco) */
+  .btn-secondary {
+    @apply border border-slate-300 bg-white text-slate-700 
+           hover:bg-slate-50 hover:border-slate-400;
+  }
+
+  /* Diseño de Tablas de datos */
+  .table-container {
+    @apply overflow-hidden rounded-xl border border-slate-200 bg-white;
+  }
+
+  .table-main {
+    @apply w-full border-collapse text-left text-sm;
+  }
+
+  .table-main th {
+    @apply bg-slate-50 border-b border-slate-200 px-4 py-3 font-semibold text-slate-700;
+  }
+
+  .table-main td {
+    @apply border-b border-slate-100 px-4 py-3 text-slate-600;
+  }
+}

@@ -1,0 +1,37 @@
+# -----------------------------------------------------------------------------
+# 004_proparcon_housekeeping_20260202_2200.yaml
+# -----------------------------------------------------------------------------
+# Objetivo:
+# - Establecer un changeset "real" post-Alembic para fijar el flujo incremental.
+# - No modifica tablas de negocio. Solo housekeeping de Liquibase.
+#
+# Por qué existe:
+# - Después de migrar desde Alembic, conviene dejar un primer incremental limpio
+#   que valide que el pipeline (validate/update) está estable y que las rutas e
+#   includes funcionan.
+#
+# Seguridad:
+# - Idempotente: marcado con preConditions.
+# - No destruye nada.
+# -----------------------------------------------------------------------------
+
+databaseChangeLog:
+  - changeSet:
+      id: 004-housekeeping-20260202-2200
+      author: proparcon
+      comments: "Primer incremental real post-Alembic. No cambia modelo: solo smoke-test del pipeline."
+
+      preConditions:
+        onFail: MARK_RAN
+        onError: HALT
+        - dbms:
+            type: postgresql
+
+      changes:
+        # 1) Etiqueta de despliegue (útil para auditoría / rollback futuro).
+        - tagDatabase:
+            tag: "post-alembic-cleanup"
+
+        # 2) Nota en el changelog (comentario operativo).
+        #    No es una operación SQL; es solo claridad para humanos.
+        - comment: "Liquibase pipeline OK. A partir de aquí, todo cambio de esquema entra por incremental/."

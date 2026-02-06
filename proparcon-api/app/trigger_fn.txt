@@ -1,0 +1,34 @@
+                                      pg_get_functiondef                                       
+-----------------------------------------------------------------------------------------------
+ CREATE OR REPLACE FUNCTION proparcon.trg_check_exclusion_alquiler()                          +
+  RETURNS trigger                                                                             +
+  LANGUAGE plpgsql                                                                            +
+ AS $function$\r                                                                              +
+ DECLARE v_inmueble bigint; v_activas int;\r                                                  +
+ BEGIN\r                                                                                      +
+   IF TG_OP IN ('INSERT','UPDATE') THEN\r                                                     +
+     v_inmueble := proparcon.fn_inmueble_de_estancia(NEW.estancia_id);\r                      +
+ \r                                                                                           +
+     SELECT\r                                                                                 +
+       (SELECT COUNT(*) FROM proparcon.alquiler_oferta ao\r                                   +
+          JOIN proparcon.estancia e1 ON e1.id = ao.estancia_id\r                              +
+        WHERE ao.fecha_baja IS NULL\r                                                         +
+          AND e1.inmueble_id = v_inmueble\r                                                   +
+          AND (TG_TABLE_NAME <> 'alquiler_oferta' OR ao.id <> COALESCE(NEW.id,0)))\r          +
+       +\r                                                                                    +
+       (SELECT COUNT(*) FROM proparcon.alquiler_contrato ac\r                                 +
+          JOIN proparcon.estancia e2 ON e2.id = ac.estancia_id\r                              +
+        WHERE ac.activo = true\r                                                              +
+          AND e2.inmueble_id = v_inmueble\r                                                   +
+          AND (TG_TABLE_NAME <> 'alquiler_contrato' OR ac.id <> COALESCE(NEW.id,0)))\r        +
+     INTO v_activas;\r                                                                        +
+ \r                                                                                           +
+     IF v_activas > 0 THEN\r                                                                  +
+       RAISE EXCEPTION 'Ya hay alquiler (oferta/contrato) activo en inmueble %', v_inmueble;\r+
+     END IF;\r                                                                                +
+   END IF;\r                                                                                  +
+   RETURN NEW;\r                                                                              +
+ END; $function$                                                                              +
+ 
+(1 row)
+
