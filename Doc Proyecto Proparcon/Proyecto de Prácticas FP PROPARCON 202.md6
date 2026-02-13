@@ -1,0 +1,233 @@
+Proyecto de Prácticas FP: PROPARCON 2026
+
+Este documento constituye la referencia técnica y operativa para el periodo de prácticas (3 de marzo - 29 de mayo de 2026). El proyecto integra los objetivos de negocio de Juan (Responsable Funcional) con la coordinación técnica de Pedro (TIC) y la ejecución de los técnicos Oscar e Ibai.
+
+1. Análisis DAFO (SWOT)
+
+Fortalezas (Internas)
+
+Oportunidades (Externas)
+
+- Perfiles técnicos DAM y ASIR complementarios.
+
+- Optimización mediante IA (Codex, Gemini).
+
+- Modelo de datos validado previamente en Excel.
+
+- Estandarización de procesos en el tenant O365.
+
+- Enfoque Cloud-First (Supabase/Render).
+
+- Metodología SDD para desarrollo rápido.
+
+Debilidades (Internas)
+
+Amenazas (Externas)
+
+- Licenciamiento Business Basic limitado.
+
+- Medidas anti-scraping severas de Idealista.
+
+- Dependencia secuencial estricta de proyectos.
+
+- Límites de uso en niveles gratuitos (Free Tier).
+
+- Eliminación de entorno Docker local para P3.
+
+- Complejidad en la hibridación Nube-Local.
+
+2. Modelo Funcional: PROPARCON
+
+El sistema se basa en la gestión de activos inmobiliarios y sus relaciones contractuales:
+
+Inmueble 1 ─── N Estancia: Un inmueble se divide en múltiples unidades alquilables.
+
+Inmueble 1 ─── N Propietario: Un inmueble puede pertenecer a uno o varios dueños.
+
+Estancia 1 ─── N Arrendatario: Historial de inquilinos por cada unidad o estancia.
+
+Estancia 1 ─── N Arrendador: Gestión de la parte arrendadora para cobros y contratos.
+
+Catálogos: Gestión centralizada de Tipos de Inmueble, Estados, Localidades y Tipos de Contrato.
+
+3. Matriz RACI (Responsabilidades)
+
+R (Responsible) | A (Accountable) | C (Consulted) | I (Informed)
+
+Tarea / Proyecto
+
+Juan (RF)
+
+Pedro (Coord. TIC)
+
+Oscar (ASIR/DAM)
+
+Ibai (DAM)
+
+GRUPO 1 (Prioridad Alta)
+
+
+
+
+
+
+
+
+
+P1. Auditoría O365 + PA
+
+I
+
+A
+
+R
+
+I
+
+P2. MVP Power App (Inmuebles)
+
+A
+
+C
+
+R
+
+R
+
+P4. Setup Cloud (Supabase/Render)
+
+I
+
+A
+
+R
+
+R
+
+P3. Stack Web (FastAPI/React)
+
+A
+
+C
+
+R
+
+R
+
+GRUPO 2 (Prioridad Baja)
+
+
+
+
+
+
+
+
+
+P5. MVP Inventario (Lovable)
+
+A
+
+I
+
+C
+
+R
+
+P6. Intranet SharePoint
+
+A
+
+C
+
+R
+
+I
+
+P7. Refactorización Scraping
+
+I
+
+I
+
+C
+
+R
+
+P8. Proxmox, VPN y n8n Local
+
+I
+
+A
+
+R
+
+I
+
+4. Metodología y Toolchain
+
+Spec Driven Development (SDD)
+
+El desarrollo se basa en la creación de especificaciones detalladas en Markdown que sirven como prompt avanzado para las herramientas de IA, asegurando que el código generado sea coherente con el diseño previo y minimizando errores de integración.
+
+Toolchain de Desarrollo
+
+IDEs & IA: VS Code, ChatGPT con Codex, Gemini.
+
+Calidad: Sonar (integrado en VS Code) para análisis estático y seguridad.
+
+Gestión de Datos: DBeaver (conexión remota a instancias de Supabase).
+
+Pruebas de API: Postman para validación de endpoints.
+
+Automatización: PowerShell para scripts locales; Power Automate (PA) para procesos de Office 365.
+
+5. Descripción Detallada de Proyectos
+
+GRUPO 1: Cierre antes del 30 de Abril
+
+P1: Auditoría Tenant Office 365
+
+Revisión de seguridad para licencias Business Basic. Foco en MFA, registros DNS (SPF, DKIM, DMARC) y automatización de procesos administrativos mediante Power Automate (PA).
+
+P2: MVP Power App
+
+Desarrollo táctico de una aplicación para la gestión de Inmuebles y estancias. Uso de Excel/Listas como origen de datos inicial. El objetivo es validar el flujo de negocio con Juan antes del desarrollo profesional en el Proyecto 3.
+
+P4: Escenario Cloud (Requisito Crítico)
+
+Configuración de la infraestructura en la nube. Setup de Supabase (Postgres) y Render (Servicios para API y Frontend). Se definen entornos dev y pro. Este entorno sustituye a Docker para el desarrollo del Proyecto 3.
+
+P3: Stack Web Final
+
+Desarrollo del sistema core de Proparcon:
+
+Diseño ER V2.0: Modelo relacional final en Postgres basado en los hallazgos del MVP.
+
+Fase Seed: Carga de datos iniciales en la base de datos de desarrollo.
+
+Desarrollo API: FastAPI con validación Pydantic y lógica de negocio.
+
+Desarrollo UI: React con Tailwind CSS (Enfoque Mobile-First).
+
+Ciclo de Pruebas: Validación técnica y funcional directamente en el escenario Cloud.
+
+6. GRUPO 2: Cierre antes del 29 de Mayo
+
+P5: MVP Inventario
+
+Uso de Lovable para prototipar rápidamente una solución de gestión de activos y registro fotográfico de estancias (check-in/check-out).
+
+P6: Intranet SharePoint
+
+Portal de comunicación y repositorio documental centralizado, utilizando Sitios de Comunicación de SharePoint Online.
+
+P7: Scraping Idealista
+
+Limpieza, refactorización y documentación del código Python actual para su ejecución controlada en un contenedor local.
+
+P8: Proxmox y Redes
+
+Implementación de virtualización local con Proxmox VE. Configuración de VPN Wireguard, DNS local, Firewall y una instancia de n8n para automatizaciones de sistema e integración de datos.
+
+Contacto Técnico: prepetto@proparcon.es

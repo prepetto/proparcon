@@ -100,16 +100,16 @@
         }
 
         /* Funcional Diagram */
-        .diagram { display: flex; flex-direction: column; gap: 30px; align-items: center; width: 100%; }
+        .diagram { display: flex; flex-direction: column; gap: 20px; align-items: center; width: 100%; }
         .rel-row { display: flex; align-items: center; gap: 40px; font-size: 26px; font-weight: 700; }
-        .box { background: var(--tile-bg); border: 2px solid var(--accent-cyan); padding: 20px 40px; border-radius: 12px; min-width: 280px; text-align: center; }
-        .arrow { color: var(--accent-lime); font-size: 30px; }
+        .box { background: var(--tile-bg); border: 2px solid var(--accent-cyan); padding: 15px 30px; border-radius: 12px; min-width: 280px; text-align: center; }
+        .arrow { color: var(--accent-lime); font-size: 24px; font-family: 'JetBrains Mono', monospace; }
 
         /* Metodología Tiles */
         .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 30px; }
         .tile { background: var(--tile-bg); padding: 35px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.1); }
         .tile h3 { color: var(--accent-lime); font-size: 32px; margin-top: 0; border-bottom: 2px solid var(--accent-cyan); padding-bottom: 10px; margin-bottom: 20px; }
-        .tile p { font-size: 24px; color: var(--text-dim); line-height: 1.5; }
+        .tile p { font-size: 22px; color: var(--text-dim); line-height: 1.5; }
 
         /* Badge Prioridad */
         .badge { background: var(--accent-cyan); color: var(--bg-dark); padding: 5px 15px; border-radius: 10px; font-size: 18px; font-weight: 800; vertical-align: middle; margin-left: 20px; }
@@ -161,7 +161,7 @@
                     <p>Responsable Funcional. Validación de procesos y aprobación de MVPs.</p>
                 </div>
                 <div class="tile">
-                    <h3><i class="fa-solid fa-shield-halved"></i>Pedro</h3>
+                    <h3><i class="fa-solid fa-handshake-angle"></i>Pedro</h3>
                     <p>Asesor TIC. Coordinación técnica.</p>
                 </div>
                 <div class="tile">
@@ -219,7 +219,7 @@
                 </div>
                 <div class="tile">
                     <h3>Toolchain</h3>
-                    <p>Dbeaver<br>Postman<br>Powershell<br>VsCode<br>Chatgpt con Codex<br>Gemini</p>
+                    <p>Dbeaver, Postman, Powershell<br>VsCode<br>ChatGPT + Codex<br>Gemini</p>
                 </div>
             </div>
             <div style="margin-top: 50px; text-align: center; font-family: 'JetBrains Mono'; color: var(--accent-cyan); font-size: 26px;">
@@ -241,55 +241,48 @@
         </div>
     </div>
 
-    <!-- Detalle G1: P1 -->
+    <!-- Detalles P1-P4 -->
     <div class="slide-container">
         <h2 class="slide-title">P1: Auditoría O365</h2>
         <div class="content-area">
             <ul class="bullet-list">
-                <li>Análisis de seguridad en licencias <strong>Business Basic</strong>.</li>
+                <li>Análisis de seguridad en licencias Business Basic.</li>
                 <li>Endurecimiento de identidad: <strong>MFA obligatorio</strong>.</li>
-                <li>Automatización procesos con <strong>PA</strong> (Power Automate).</li>
-                <li>Auditoría de registros DNS (SPF, DKIM, DMARC) para entregabilidad.</li>
-                <li>Revisión de permisos de compartición externa en SharePoint.</li>
+                <li>Automatización de procesos con <strong>PA (Power Automate)</strong>.</li>
+                <li>Auditoría registros DNS (SPF, DKIM, DMARC).</li>
             </ul>
         </div>
     </div>
 
-    <!-- Detalle G1: P2 -->
     <div class="slide-container">
         <h2 class="slide-title">P2: MVP Power App</h2>
         <div class="content-area">
             <ul class="bullet-list">
-                <li>Prototipado rápido sobre capa de datos <strong>Excel/Listas</strong>.</li>
-                <li>Formularios de alta y gestión de inmuebles/habitaciones.</li>
-                <li>Lógica de negocio: Flujos de aprobación en <strong>Power Automate</strong>.</li>
-                <li>Validación de procesos reales con el responsable funcional (Juan).</li>
+                <li>Prototipado rápido sobre Excel/Listas.</li>
+                <li>Gestión de Inmuebles y estancias.</li>
+                <li>Validación de flujos de negocio con el usuario final.</li>
             </ul>
         </div>
     </div>
 
-    <!-- Detalle G1: P4 (Requisito) -->
     <div class="slide-container">
         <h2 class="slide-title">P4: Escenario Cloud</h2>
         <div class="content-area">
             <ul class="bullet-list">
-                <li>Setup de <strong>Supabase</strong> como persistencia remota (Postgres).</li>
-                <li>Despliegue de servicios en <strong>Render</strong> para el API y Web.</li>
-                <li>Configuración de entornos segregados (<code>dev</code> / <code>pro</code>).</li>
-                <li>Pipeline de <strong>CI/CD</strong> automático desde ramas de GitHub.</li>
+                <li>Setup de <strong>Supabase</strong> (Postgres) y <strong>Render</strong>.</li>
+                <li>Configuración de entornos <code>dev</code> y <code>pro</code>.</li>
+                <li>Sustitución de Docker local para el desarrollo de P3.</li>
             </ul>
         </div>
     </div>
 
-    <!-- Detalle G1: P3 -->
     <div class="slide-container">
         <h2 class="slide-title">P3: Stack Web Final</h2>
         <div class="content-area">
             <ul class="bullet-list">
-                <li>Migración del modelo a <strong>Esquema ER V2.0</strong> en Postgres.</li>
-                <li>API robusta con <strong>FastAPI</strong> y validaciones Pydantic.</li>
-                <li>Interfaz moderna y responsive con <strong>React + Tailwind</strong>.</li>
-                <li>Fase de Seed y QA integral (DB → API → Frontend).</li>
+                <li>Migración a <strong>Esquema ER V2.0</strong> en Postgres.</li>
+                <li>API con FastAPI y Frontend con React + Tailwind.</li>
+                <li>Ciclo de pruebas directamente en Cloud.</li>
             </ul>
         </div>
     </div>
@@ -307,54 +300,43 @@
         </div>
     </div>
 
-    <!-- Detalle G2: P5 -->
+    <!-- Detalles P5-P8 -->
     <div class="slide-container">
-        <h2 class="slide-title">P5: MVP Inventario</h2>
+        <h2 class="slide-title">P5: Inventario Lovable</h2>
         <div class="content-area">
             <ul class="bullet-list">
-                <li>Uso de herramientas de generación rápida con IA (<strong>Lovable</strong>).</li>
-                <li>Gestión visual de activos, muebles y enseres por estancia.</li>
-                <li>Captura de fotos para estados de check-in / check-out.</li>
-                <li>Exportación de datos para integración futura.</li>
+                <li>Uso de herramientas IA para prototipado ultrarrápido.</li>
+                <li>Registro fotográfico y estados de check-in de estancias.</li>
             </ul>
         </div>
     </div>
 
-    <!-- Detalle G2: P6 -->
     <div class="slide-container">
         <h2 class="slide-title">P6: Intranet SharePoint</h2>
         <div class="content-area">
             <ul class="bullet-list">
-                <li>Portal central de comunicación interna para Proparcon.</li>
-                <li>Bibliotecas de manuales, procesos y documentación técnica.</li>
-                <li>Dashboard de accesos rápidos a las aplicaciones del Grupo 1.</li>
-                <li>Uso de Sitios de Comunicación para máxima usabilidad.</li>
+                <li>Portal de comunicación y repositorio documental.</li>
+                <li>Centralización de manuales y procesos.</li>
             </ul>
         </div>
     </div>
 
-    <!-- Detalle G2: P7 -->
     <div class="slide-container">
         <h2 class="slide-title">P7: Scraping Idealista</h2>
         <div class="content-area">
             <ul class="bullet-list">
-                <li>Refactorización y limpieza del script Python actual.</li>
-                <li>Migración a <strong>contenedor Docker</strong> en servidor local.</li>
-                <li>Optimización de tiempos para evitar detección de bots (Bypass).</li>
-                <li>Documentación técnica para ejecución bajo demanda.</li>
+                <li>Refactorización de scripts Python existentes.</li>
+                <li>Migración a contenedor local para ejecución controlada.</li>
             </ul>
         </div>
     </div>
 
-    <!-- Detalle G2: P8 -->
     <div class="slide-container">
         <h2 class="slide-title">P8: Proxmox & Redes</h2>
         <div class="content-area">
             <ul class="bullet-list">
-                <li>Setup de Hypervisor <strong>Proxmox VE</strong> sobre hardware local.</li>
-                <li>Túneles seguros con <strong>VPN Wireguard</strong> para acceso remoto.</li>
-                <li>Automatizaciones internas con instancia local de <strong>n8n</strong>.</li>
-                <li>Servicios críticos: DNS interno, Proxy inverso y Firewall.</li>
+                <li>Setup de Hypervisor Proxmox VE local.</li>
+                <li>Configuración de <strong>VPN Wireguard</strong> y n8n local.</li>
             </ul>
         </div>
     </div>
