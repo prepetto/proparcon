@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prácticas FP - PROPARCON 2026</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@400;500;700&family=JetBrains+Mono&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --accent-lime: #d9f99d;
+            --accent-cyan: #22d3ee;
+            --text-main: #f8fafc;
+            --text-dim: #cbd5e1;
+            --tile-bg: #1e293b;
+            --font-size-title: 60px;
+            --font-size-body: 28px;
+        }
+
+        /* NAVEGACIÓN SLIDE A SLIDE (SNAP) */
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            overflow: hidden; 
+            background-color: var(--bg-dark);
+        }
+
+        .presentation-wrapper {
+            height: 100vh;
+            overflow-y: auto;
+            scroll-snap-type: y mandatory;
+            scroll-behavior: smooth;
+        }
+
+        .slide-container {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            scroll-snap-align: start;
+            position: relative;
+            padding: 60px 100px;
+            box-sizing: border-box;
+            font-family: 'Urbanist', sans-serif;
+            color: var(--text-main);
+        }
+
+        .slide-container::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(circle at 90% 10%, rgba(34, 211, 238, 0.05) 0%, transparent 50%);
+            z-index: -1;
+        }
+
+        .slide-title {
+            font-size: var(--font-size-title);
+            font-weight: 700;
+            margin-bottom: 40px;
+            color: var(--accent-lime);
+            text-transform: uppercase;
+            letter-spacing: -1.5px;
+            width: 100%;
+            text-align: left;
+            border-bottom: 4px solid var(--accent-cyan);
+            padding-bottom: 10px;
+        }
+
+        .content-area {
+            width: 100%;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        /* Portada */
+        .title-layout h1 { font-size: 110px; margin: 0; line-height: 0.9; }
+        .highlight { color: var(--accent-lime); font-weight: 800; text-shadow: 0 0 20px rgba(217, 249, 157, 0.3); }
+        .location-date { font-size: 32px; color: var(--text-dim); margin-top: 40px; font-family: 'JetBrains Mono', monospace; }
+
+        /* Agenda */
+        .agenda-list { list-style: none; padding: 0; width: 100%; }
+        .agenda-list li { 
+            font-size: 38px; 
+            margin-bottom: 25px; 
+            padding-left: 70px; 
+            position: relative; 
+            color: var(--text-main);
+        }
+        .agenda-list li::before {
+            content: '•';
+            position: absolute; left: 0; color: var(--accent-cyan); font-weight: 700;
+        }
+
+        /* Funcional Diagram */
+        .diagram { display: flex; flex-direction: column; gap: 30px; align-items: center; width: 100%; }
+        .rel-row { display: flex; align-items: center; gap: 40px; font-size: 26px; font-weight: 700; }
+        .box { background: var(--tile-bg); border: 2px solid var(--accent-cyan); padding: 20px 40px; border-radius: 12px; min-width: 280px; text-align: center; }
+        .arrow { color: var(--accent-lime); font-size: 30px; }
+
+        /* Metodología Tiles */
+        .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 30px; }
+        .tile { background: var(--tile-bg); padding: 35px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.1); }
+        .tile h3 { color: var(--accent-lime); font-size: 32px; margin-top: 0; border-bottom: 2px solid var(--accent-cyan); padding-bottom: 10px; margin-bottom: 20px; }
+        .tile p { font-size: 24px; color: var(--text-dim); line-height: 1.5; }
+
+        /* Badge Prioridad */
+        .badge { background: var(--accent-cyan); color: var(--bg-dark); padding: 5px 15px; border-radius: 10px; font-size: 18px; font-weight: 800; vertical-align: middle; margin-left: 20px; }
+
+        .bullet-list { font-size: 28px; line-height: 1.5; list-style: none; padding: 0; }
+        .bullet-list li { margin-bottom: 15px; position: relative; padding-left: 45px; }
+        .bullet-list li::before { content: '→'; position: absolute; left: 0; color: var(--accent-lime); font-weight: 800; }
+
+        /* Iconos */
+        .fa-solid { color: var(--accent-lime); margin-right: 15px; }
+    </style>
+</head>
+<body>
+
+<div class="presentation-wrapper" id="wrapper">
+
+    <!-- 1. Portada -->
+    <div class="slide-container" id="slide1">
+        <div class="title-layout" style="text-align: center;">
+            <p style="font-size: 40px; letter-spacing: 5px; margin-bottom: 20px;">PROYECTO</p>
+            <h1>Prácticas <span class="highlight">FP</span></h1>
+            <h2 style="font-size: 90px; margin: 20px 0;">Digitalización <span class="highlight">PROPARCON</span></h2>
+            <p class="location-date">Madrid | 14 de Febrero de 2026</p>
+        </div>
+    </div>
+
+    <!-- 2. Agenda -->
+    <div class="slide-container" id="slide2">
+        <h2 class="slide-title">Agenda de la Sesión</h2>
+        <div class="content-area">
+            <ul class="agenda-list">
+                <li>Bienvenida y Presentaciones</li>
+                <li>Equipo y Perfiles</li>
+                <li>Proparcon Funcional</li>
+                <li>Metodología y Herramientas</li>
+                <li>Proyectos G1: P1 a P4</li>
+                <li>Proyectos G2: P5 a P8</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- 3. Equipo -->
+    <div class="slide-container" id="slide3">
+        <h2 class="slide-title">Equipo y Perfiles</h2>
+        <div class="content-area">
+            <div class="grid-3">
+                <div class="tile">
+                    <h3><i class="fa-solid fa-user-tie"></i>Juan</h3>
+                    <p>Responsable Funcional. Validación de procesos y aprobación de MVPs.</p>
+                </div>
+                <div class="tile">
+                    <h3><i class="fa-solid fa-shield-halved"></i>Pedro</h3>
+                    <p>Asesor TIC. Coordinación técnica.</p>
+                </div>
+                <div class="tile">
+                    <h3><i class="fa-solid fa-laptop-code"></i>Oscar e Ibai</h3>
+                    <p>Técnicos DAM/ASIR. Desarrollo Fullstack, Infraestructura y Automatización.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 4. Proparcon Funcional -->
+    <div class="slide-container" id="slide4">
+        <h2 class="slide-title">Proparcon Funcional</h2>
+        <div class="content-area">
+            <div class="diagram">
+                <div class="rel-row">
+                    <div class="box">Inmueble</div>
+                    <div class="arrow">1 ─── N</div>
+                    <div class="box">Estancia</div>
+                </div>
+                <div class="rel-row">
+                    <div class="box">Inmueble</div>
+                    <div class="arrow">1 ─── N</div>
+                    <div class="box">Propietario</div>
+                </div>
+                <div class="rel-row">
+                    <div class="box">Estancia</div>
+                    <div class="arrow">1 ─── N</div>
+                    <div class="box">Arrendatario</div>
+                </div>
+                <div class="rel-row">
+                    <div class="box">Estancia</div>
+                    <div class="arrow">1 ─── N</div>
+                    <div class="box">Arrendador</div>
+                </div>
+            </div>
+            <div style="margin-top: 40px; padding: 20px; border: 2px dashed var(--accent-lime); border-radius: 15px; font-size: 26px; text-align: center;">
+                <i class="fa-solid fa-list-check"></i> Gestión de <strong>Catálogos</strong> del Sistema
+            </div>
+        </div>
+    </div>
+
+    <!-- 5. Metodología y Herramientas -->
+    <div class="slide-container" id="slide5">
+        <h2 class="slide-title">Metodología y Herramientas</h2>
+        <div class="content-area">
+            <div class="grid-3">
+                <div class="tile">
+                    <h3>Power Apps</h3>
+                    <p>Power Automate<br>SharePoint Online<br>Excel & Listas</p>
+                </div>
+                <div class="tile">
+                    <h3>Stack Pro</h3>
+                    <p>PostgreSQL<br>FastAPI (Python)<br>React.js</p>
+                </div>
+                <div class="tile">
+                    <h3>Toolchain</h3>
+                    <p>Dbeaver<br>Postman<br>Powershell<br>VsCode<br>Chatgpt con Codex<br>Gemini</p>
+                </div>
+            </div>
+            <div style="margin-top: 50px; text-align: center; font-family: 'JetBrains Mono'; color: var(--accent-cyan); font-size: 26px;">
+                SDD (Spec Driven Development) + IA (Codex/Sonar)
+            </div>
+        </div>
+    </div>
+
+    <!-- 6. Proyectos G1 -->
+    <div class="slide-container" id="slide6">
+        <h2 class="slide-title">Proyectos G1 <span class="badge">Prioridad Alta</span></h2>
+        <div class="content-area">
+            <ul class="bullet-list">
+                <li><i class="fa-solid fa-lock"></i><strong>P1:</strong> Auditoría Tenant Office 365 y Seguridad MFA.</li>
+                <li><i class="fa-solid fa-table"></i><strong>P2:</strong> MVP Power App Gestión Patrimonial.</li>
+                <li><i class="fa-solid fa-cloud"></i><strong>P4:</strong> Escenario Cloud (Supabase/Render) - <span style="color:var(--accent-cyan)">Req. previo P3</span>.</li>
+                <li><i class="fa-solid fa-code"></i><strong>P3:</strong> Stack Web Final (Postgres + FastAPI + React).</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Detalle G1: P1 -->
+    <div class="slide-container">
+        <h2 class="slide-title">P1: Auditoría O365</h2>
+        <div class="content-area">
+            <ul class="bullet-list">
+                <li>Análisis de seguridad en licencias <strong>Business Basic</strong>.</li>
+                <li>Endurecimiento de identidad: <strong>MFA obligatorio</strong>.</li>
+                <li>Automatización procesos con <strong>PA</strong> (Power Automate).</li>
+                <li>Auditoría de registros DNS (SPF, DKIM, DMARC) para entregabilidad.</li>
+                <li>Revisión de permisos de compartición externa en SharePoint.</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Detalle G1: P2 -->
+    <div class="slide-container">
+        <h2 class="slide-title">P2: MVP Power App</h2>
+        <div class="content-area">
+            <ul class="bullet-list">
+                <li>Prototipado rápido sobre capa de datos <strong>Excel/Listas</strong>.</li>
+                <li>Formularios de alta y gestión de inmuebles/habitaciones.</li>
+                <li>Lógica de negocio: Flujos de aprobación en <strong>Power Automate</strong>.</li>
+                <li>Validación de procesos reales con el responsable funcional (Juan).</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Detalle G1: P4 (Requisito) -->
+    <div class="slide-container">
+        <h2 class="slide-title">P4: Escenario Cloud</h2>
+        <div class="content-area">
+            <ul class="bullet-list">
+                <li>Setup de <strong>Supabase</strong> como persistencia remota (Postgres).</li>
+                <li>Despliegue de servicios en <strong>Render</strong> para el API y Web.</li>
+                <li>Configuración de entornos segregados (<code>dev</code> / <code>pro</code>).</li>
+                <li>Pipeline de <strong>CI/CD</strong> automático desde ramas de GitHub.</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Detalle G1: P3 -->
+    <div class="slide-container">
+        <h2 class="slide-title">P3: Stack Web Final</h2>
+        <div class="content-area">
+            <ul class="bullet-list">
+                <li>Migración del modelo a <strong>Esquema ER V2.0</strong> en Postgres.</li>
+                <li>API robusta con <strong>FastAPI</strong> y validaciones Pydantic.</li>
+                <li>Interfaz moderna y responsive con <strong>React + Tailwind</strong>.</li>
+                <li>Fase de Seed y QA integral (DB → API → Frontend).</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- 7. Proyectos G2 -->
+    <div class="slide-container" id="slide7">
+        <h2 class="slide-title">Proyectos G2 <span class="badge" style="background:var(--text-dim)">Prioridad Baja</span></h2>
+        <div class="content-area">
+            <ul class="bullet-list">
+                <li><i class="fa-solid fa-boxes-stacked"></i><strong>P5:</strong> MVP Aplicación Inventario (Lovable).</li>
+                <li><i class="fa-solid fa-sitemap"></i><strong>P6:</strong> Intranet SharePoint Proparcon.</li>
+                <li><i class="fa-solid fa-spider"></i><strong>P7:</strong> Scraping Idealista (Refactorización local).</li>
+                <li><i class="fa-solid fa-server"></i><strong>P8:</strong> Infraestructura Proxmox, VPN y n8n Local.</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Detalle G2: P5 -->
+    <div class="slide-container">
+        <h2 class="slide-title">P5: MVP Inventario</h2>
+        <div class="content-area">
+            <ul class="bullet-list">
+                <li>Uso de herramientas de generación rápida con IA (<strong>Lovable</strong>).</li>
+                <li>Gestión visual de activos, muebles y enseres por estancia.</li>
+                <li>Captura de fotos para estados de check-in / check-out.</li>
+                <li>Exportación de datos para integración futura.</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Detalle G2: P6 -->
+    <div class="slide-container">
+        <h2 class="slide-title">P6: Intranet SharePoint</h2>
+        <div class="content-area">
+            <ul class="bullet-list">
+                <li>Portal central de comunicación interna para Proparcon.</li>
+                <li>Bibliotecas de manuales, procesos y documentación técnica.</li>
+                <li>Dashboard de accesos rápidos a las aplicaciones del Grupo 1.</li>
+                <li>Uso de Sitios de Comunicación para máxima usabilidad.</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Detalle G2: P7 -->
+    <div class="slide-container">
+        <h2 class="slide-title">P7: Scraping Idealista</h2>
+        <div class="content-area">
+            <ul class="bullet-list">
+                <li>Refactorización y limpieza del script Python actual.</li>
+                <li>Migración a <strong>contenedor Docker</strong> en servidor local.</li>
+                <li>Optimización de tiempos para evitar detección de bots (Bypass).</li>
+                <li>Documentación técnica para ejecución bajo demanda.</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Detalle G2: P8 -->
+    <div class="slide-container">
+        <h2 class="slide-title">P8: Proxmox & Redes</h2>
+        <div class="content-area">
+            <ul class="bullet-list">
+                <li>Setup de Hypervisor <strong>Proxmox VE</strong> sobre hardware local.</li>
+                <li>Túneles seguros con <strong>VPN Wireguard</strong> para acceso remoto.</li>
+                <li>Automatizaciones internas con instancia local de <strong>n8n</strong>.</li>
+                <li>Servicios críticos: DNS interno, Proxy inverso y Firewall.</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- 8. Dudas -->
+    <div class="slide-container" id="slide8">
+        <div class="title-layout">
+            <h2 style="font-size: 120px; color: var(--accent-lime); margin-bottom: 20px;">¿Dudas?</h2>
+            <p style="font-size: 36px; margin-top: 0;">Muchas gracias por vuestra atención.</p>
+            <div style="margin-top: 60px; padding: 25px 60px; border: 3px solid var(--accent-cyan); border-radius: 60px; font-family: 'JetBrains Mono'; color: var(--accent-cyan); font-size: 30px;">
+                prepetto@proparcon.es
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    // CONTROL DE NAVEGACIÓN POR TECLADO
+    const wrapper = document.getElementById('wrapper');
+    const slides = document.querySelectorAll('.slide-container');
+    let currentSlideIndex = 0;
+
+    window.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowDown' || e.key === 'ArrowRight' || e.key === ' ') {
+            e.preventDefault();
+            if (currentSlideIndex < slides.length - 1) {
+                currentSlideIndex++;
+                slides[currentSlideIndex].scrollIntoView({ behavior: 'smooth' });
+            }
+        }
+        if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+            e.preventDefault();
+            if (currentSlideIndex > 0) {
+                currentSlideIndex--;
+                slides[currentSlideIndex].scrollIntoView({ behavior: 'smooth' });
+            }
+        }
+    });
+
+    // Detectar scroll manual para actualizar el índice
+    wrapper.addEventListener('scroll', () => {
+        const index = Math.round(wrapper.scrollTop / window.innerHeight);
+        currentSlideIndex = index;
+    });
+</script>
+
+</body>
+</html>
