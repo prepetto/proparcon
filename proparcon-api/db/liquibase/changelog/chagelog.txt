@@ -1,0 +1,13 @@
+Listado de rutas de carpetas para el volumen OS
+El número de serie del volumen es C4D0-4F21
+C:.
+¦   001_baseline.yaml
+¦   chagelog.txt
+¦   db.changelog-baseline-only.yaml
+¦   db.changelog-master.yaml
+¦   
++---incremental
+        .gitkeep
+        003_drop_alembic_version_20260130_2200.yaml
+        004_proparcon_housekeeping_20260202_2200.yaml
+        

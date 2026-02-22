@@ -22,8 +22,8 @@ databaseChangeLog:
       comments: "Primer incremental real post-Alembic. No cambia modelo: solo smoke-test del pipeline."
 
       preConditions:
-        onFail: MARK_RAN
-        onError: HALT
+        - onFail: MARK_RAN
+        - onError: HALT
         - dbms:
             type: postgresql
 
